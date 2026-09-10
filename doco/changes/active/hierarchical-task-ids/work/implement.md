@@ -2,7 +2,7 @@
 
 ## 1. 现状、目标与设计基线
 
-[src/check/tasks.rs](../../../../../src/check/tasks.rs) 用正则同时识别任务行和依赖 ID，目前只接受 `T` 加至少三位数字。[assets/skill](../../../../../assets/skill/) 是安装源，[仓库内 doco skill](../../../../../.agents/skills/doco/) 是安装副本；[文档格式](../../../../../docs/document-format.md) 定义公开格式。测试夹具和仓库自己的 active/completed 工作包仍使用旧编号。当前未提交的 list 与终端改动不改变任务 ID 的解析职责，本变更不得覆盖这些工作。
+[src/check/tasks.rs](../../../../../src/check/tasks.rs) 用正则同时识别任务行和依赖 ID，目前只接受 `T` 加至少三位数字。[assets/skill](../../../../../assets/skill/) 是安装源，[仓库内 doco skill](../../../../../.agents/skills/doco/) 是安装副本；[文档格式](../../../../specs/document-format.md) 定义公开格式。测试夹具和仓库自己的 active/completed 工作包仍使用旧编号。当前未提交的 list 与终端改动不改变任务 ID 的解析职责，本变更不得覆盖这些工作。
 
 ## 2. 整体方案
 
@@ -22,4 +22,4 @@
 
 ## 6. 验证与长期文档影响
 
-自动测试覆盖合法分层编号、重复、未知依赖、依赖环、未完成依赖及多种非法边界，并确认围栏、注释和 list 计数行为。运行 fmt、clippy、全部目标测试、locked release 构建和 Rust 1.85 locked 检查；扫描项目源码与文档，确认不再残留旧任务编号。更新 [文档格式](../../../../../docs/document-format.md) 的当前格式契约和 skill 的 create/template 文件；架构边界未改变，无需 ADR 或架构文档更新。
+自动测试覆盖合法分层编号、重复、未知依赖、依赖环、未完成依赖及多种非法边界，并确认围栏、注释和 list 计数行为。运行 fmt、clippy、全部目标测试、locked release 构建和 Rust 1.85 locked 检查；扫描项目源码与文档，确认不再残留旧任务编号。更新 [文档格式](../../../../specs/document-format.md) 的当前格式契约和 skill 的 create/template 文件；架构边界未改变，无需 ADR 或架构文档更新。

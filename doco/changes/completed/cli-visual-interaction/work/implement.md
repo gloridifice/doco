@@ -5,7 +5,7 @@
 ### 已核对的基线
 
 - 工作树起点为 Git `04dfc22`，创建前 git status --short 为空；doco list 未发现已有变更，无需复用其他目标。
-- [当前架构入口](../../../../architecture.md) 仍为初始化占位说明；doco/specs 与 doco/decisions 没有当前文档。实际已实现职责见 [架构说明](../../../../../docs/architecture.md)、[当前文档导航](../../../../../docs/README.md)，不能将空入口误当作没有实现。
+- [当前架构入口](../../../../architecture.md) 仍为初始化占位说明；doco/specs 与 doco/decisions 没有当前文档。实际已实现职责见 [架构说明](../../../../architecture.md)、[当前文档导航](../../../../README.md)，不能将空入口误当作没有实现。
 - [CLI](../../../../../src/cli.rs) 使用 clap derive；所有变更 ID 都是必填 String。init 在 stdin/stdout 均为终端时手输空白分隔 Agent 名称，否则要求 --agent。list 直接输出按 ID 排序的两列 TSV。
 - [入口](../../../../../src/main.rs) 将 anyhow 错误链写到 stderr，退出 1；Clap 管理参数错误和帮助退出。
 - [生命周期](../../../../../src/lifecycle/mod.rs)、[上下文](../../../../../src/lifecycle/context.rs)、[归档](../../../../../src/lifecycle/archive.rs)、[初始化](../../../../../src/init/mod.rs)、[计划](../../../../../src/init/plan.rs)、[检查报告](../../../../../src/check/mod.rs) 各自 println。归档模块还直接读取确认。

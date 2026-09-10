@@ -2,7 +2,7 @@
 
 ## 1. 现状、目标与设计基线
 
-当前工作树包含尚未提交但已完成的 `cli-visual-interaction` 交付，[列表查询](../../../../../src/lifecycle/list.rs)生成 `ChangeRow { id, state, tasks }`，[UI 端口](../../../../../src/ui.rs)的 `PlainReporter` 输出三列 TSV，[终端渲染](../../../../../src/terminal/output.rs)负责 TTY 三列表格或窄行。`Project::changes` 只从目录推导状态；`safety::tree` 已能递归检查工作包并采集每个节点的可选修改时间，但 `TreeEntry` 未暴露该值。[CLI 当前文档](../../../../../docs/cli.md)明确三列契约。
+当前工作树包含尚未提交但已完成的 `cli-visual-interaction` 交付，[列表查询](../../../../../src/lifecycle/list.rs)生成 `ChangeRow { id, state, tasks }`，[UI 端口](../../../../../src/ui.rs)的 `PlainReporter` 输出三列 TSV，[终端渲染](../../../../../src/terminal/output.rs)负责 TTY 三列表格或窄行。`Project::changes` 只从目录推导状态；`safety::tree` 已能递归检查工作包并采集每个节点的可选修改时间，但 `TreeEntry` 未暴露该值。[CLI 当前文档](../../../../specs/cli.md)明确三列契约。
 
 本变更只在上述列表查询和渲染链路中增加相对修改时间及显式历史状态过滤，不重写现有未提交实现，不读取文档正文推断时间，也不引入依赖或持久状态。
 
@@ -57,4 +57,4 @@ Open questions: none
 
 单测覆盖 0 秒、59 秒、10 分钟、59 分钟、1 小时、20 小时、整天、`1d2h`、`20d5h` 和未知值；Reporter 测试覆盖四列 TSV、宽 TTY 表头/对齐及窄输出。集成测试验证默认仅 active、两个历史开关的单独及组合结果、隐藏状态不触发读取、稳定的 `0m` 第四列、原有 ID 排序、任务计数和安全错误回归。
 
-运行 `cargo fmt --all --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test --all-targets`，并运行项目现有 release/MSRV 检查。同步 [CLI 当前文档](../../../../../docs/cli.md)的列表协议以及[详细架构](../../../../../docs/architecture.md)、[当前架构入口](../../../../architecture.md)的列表查询职责；持久文档格式和 ADR 无影响。
+运行 `cargo fmt --all --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test --all-targets`，并运行项目现有 release/MSRV 检查。同步 [CLI 当前文档](../../../../specs/cli.md)的列表协议以及[当前架构](../../../../architecture.md)的列表查询职责；持久文档格式和 ADR 无影响。

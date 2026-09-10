@@ -44,7 +44,7 @@ cargo build --release --locked
 
 ## Documentation
 
-- [Documentation guide](docs/README.md)
-- [CLI output and interaction contract](docs/cli.md)
-- [Architecture and failure recovery](docs/architecture.md)
-- [Machine-readable document format](docs/document-format.md)
+- [Documentation guide](doco/README.md)
+- [Architecture and failure recovery](doco/architecture.md)
+- [CLI output and interaction contract](doco/specs/cli.md)
+- [Machine-readable document format](doco/specs/document-format.md)
