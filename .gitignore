@@ -1,0 +1,17 @@
+# Rust build artifacts
+/target/
+
+# Rust compiler backup files
+**/*.rs.bk
+
+# Local environment overrides (keep templates versioned)
+.env
+.env.*
+!.env.example
+
+# OS and editor metadata
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+

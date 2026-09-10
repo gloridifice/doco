@@ -1,0 +1,19 @@
+[package]
+name = "doco"
+version = "0.1.0"
+edition = "2024"
+
+description = "File-backed change management for coding agents"
+rust-version = "1.85"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+fs2 = "0.4"
+pulldown-cmark = "0.13"
+regex = "1"
+similar = "2"
+tempfile = "3"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_Foundation"] }
