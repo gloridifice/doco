@@ -204,6 +204,11 @@ pub struct TreeEntry {
     len: u64,
     modified: Option<std::time::SystemTime>,
 }
+impl TreeEntry {
+    pub fn modified(&self) -> Option<std::time::SystemTime> {
+        self.modified
+    }
+}
 pub fn tree(root: &Path, path: &Path) -> Result<Vec<TreeEntry>> {
     fn walk(root: &Path, path: &Path, out: &mut Vec<TreeEntry>) -> Result<()> {
         inspect(root, path)?;

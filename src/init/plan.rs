@@ -1,6 +1,7 @@
 use crate::{
     Project,
     safety::{self, Snapshot},
+    ui::{self, Event, Reporter, Tone},
 };
 use anyhow::{Result, bail};
 use std::path::{Path, PathBuf};
@@ -68,7 +69,7 @@ impl Plan {
         self.reads.push((path, snapshot));
         Ok(text)
     }
-    pub fn show(&self, project: &Project) {
+    pub fn show(&self, project: &Project, reporter: &mut dyn Reporter) -> Result<()> {
         let rel = |p: &Path| {
             p.strip_prefix(project.root())
                 .unwrap_or(p)
@@ -76,7 +77,12 @@ impl Plan {
                 .to_string()
         };
         for (path, exists) in &self.directories {
-            println!("{} {}/", if *exists { "SKIP" } else { "CREATE" }, rel(path));
+            let (label, tone) = if *exists {
+                ("SKIP", Tone::Muted)
+            } else {
+                ("CREATE", Tone::Success)
+            };
+            ui::line(reporter, tone, label, &format!("{}/", rel(path)))?;
         }
         for op in &self.files {
             let status = match &op.before {
@@ -84,25 +90,30 @@ impl Plan {
                 Some(before) if before.bytes == op.after => "SKIP",
                 Some(_) => "UPDATE",
             };
-            println!("{status} {}", rel(&op.path));
+            let tone = match status {
+                "CREATE" => Tone::Success,
+                "UPDATE" => Tone::Warning,
+                _ => Tone::Muted,
+            };
+            ui::line(reporter, tone, status, &rel(&op.path))?;
             if status == "UPDATE" {
                 let old = String::from_utf8_lossy(&op.before.as_ref().unwrap().bytes);
                 let new = String::from_utf8_lossy(&op.after);
-                println!(
-                    "{}",
-                    similar::TextDiff::from_lines(&old, &new)
-                        .unified_diff()
-                        .context_radius(2)
-                        .header("existing", "planned")
-                );
+                let diff = similar::TextDiff::from_lines(&old, &new)
+                    .unified_diff()
+                    .context_radius(2)
+                    .header("existing", "planned")
+                    .to_string();
+                reporter.emit(Event::Diff { text: &diff })?;
             }
         }
         for message in &self.conflicts {
-            println!("CONFLICT {message}");
+            ui::line(reporter, Tone::Danger, "CONFLICT", message)?;
         }
         for message in &self.warnings {
-            println!("WARNING {message}");
+            ui::line(reporter, Tone::Warning, "WARNING", message)?;
         }
+        Ok(())
     }
     pub fn ensure_valid(&self) -> Result<()> {
         if !self.conflicts.is_empty() {
@@ -113,7 +124,7 @@ impl Plan {
         }
         Ok(())
     }
-    pub fn apply(self, project: &Project) -> Result<()> {
+    pub fn apply(self, project: &Project, reporter: &mut dyn Reporter) -> Result<()> {
         self.ensure_valid()?;
         let _lock = safety::Lock::acquire(project.root())?;
         // Verify every file before the first integration write, then again per replacement.
@@ -139,7 +150,7 @@ impl Plan {
                 continue;
             }
             match safety::atomic_write(project.root(), &op.path, &op.before, &op.after) {
-                Ok(()) => println!("APPLIED {}", rel(project, &op.path)),
+                Ok(()) => ui::line(reporter, Tone::Success, "APPLIED", &rel(project, &op.path))?,
                 Err(e) => bail!(
                     "partial initialization: {} failed: {e:#}; earlier APPLIED items remain; retry safely",
                     rel(project, &op.path)

@@ -4,6 +4,7 @@ pub mod lifecycle;
 pub mod markdown;
 pub mod safety;
 pub mod templates;
+pub mod ui;
 
 use anyhow::{Context, Result, bail};
 use std::{

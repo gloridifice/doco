@@ -1,36 +1,39 @@
 # doco
 
-用文件管理项目当前文档和一次性变更工作包的 Rust CLI。使用 `clap` 解析命令，不包含模型运行时，也不自动提交、发布或回滚代码。
+`doco` is a file-backed Rust CLI for managing current project documentation and one-off change packages for coding agents. It does not run models or commit, release, or roll back code.
 
-## 安装与使用
+## Install
+
+Requires Rust 1.85 or later.
 
 ```sh
 cargo install --path . --locked
-
-# 在目标项目根目录运行；非交互环境必须明确选择 Agent。
-doco init --agent codex --agent pi
-doco new bounded-event-queue
 ```
 
-`new` 只创建骨架。由开发者或 Agent 填写 `proposal.md`、`work/implement.md` 和 `work/tasks.md`，再实施和验证：
+## Quick start
+
+Run `doco` from the target project root:
 
 ```sh
+# Initialize integrations for one or more agents.
+doco init --agent codex --agent pi
+
+# Create and inspect a change package.
+doco new bounded-event-queue
 doco context bounded-event-queue
 doco check bounded-event-queue
 
-# 完成真实验收、更新当前文档与 proposal 结果后：
+# Complete the accepted work, then preview and archive it.
 doco complete bounded-event-queue
-
-# 预览后，明确授权删除 work/：
 doco archive bounded-event-queue --dry-run
-doco archive bounded-event-queue --yes
+doco archive bounded-event-queue
 ```
 
-通过 `--root <目录>` 明确指定其他项目；默认仅使用当前目录，不向上猜测项目根。`doco --help` 和 `doco <命令> --help` 是完整命令参数入口。
+`doco new` creates only the package skeleton. A developer or agent must fill in the proposal, implementation plan, and task list before doing the work.
 
-初始化支持 Codex、Pi、Claude Code；Codex/Pi 默认共享项目 `.agents/skills/doco`。`--dry-run` 不写文件；`--refresh` 仅刷新识别出的受管接入内容，不覆盖项目事实。安装完成不代表已验证 Agent 会话加载。
+Use `--root <path>` to target another project. Use `doco --help` or `doco <command> --help` for the complete command reference. In automation, pass explicit arguments and `--no-interactive`.
 
-## 开发
+## Development
 
 ```sh
 cargo fmt --all --check
@@ -39,7 +42,9 @@ cargo test --all-targets
 cargo build --release --locked
 ```
 
-- [当前文档与实现边界](docs/README.md)
-- [模块架构与失败恢复](docs/architecture.md)
-- [机械检查支持的文档格式](docs/document-format.md)
-- [原始设计案](doco-design-v2.md)：保留的产品设计输入，不代替当前实现说明。
+## Documentation
+
+- [Documentation guide](docs/README.md)
+- [CLI output and interaction contract](docs/cli.md)
+- [Architecture and failure recovery](docs/architecture.md)
+- [Machine-readable document format](docs/document-format.md)

@@ -6,11 +6,25 @@ mod skill;
 #[cfg(test)]
 mod tests;
 
-use crate::{Project, safety, templates};
+use crate::{
+    Project, safety, templates,
+    ui::{self, Reporter},
+};
 use anyhow::{Result, bail};
 use plan::Plan;
 
 pub fn run(project: &Project, agents: &[&str], dry_run: bool, refresh: bool) -> Result<()> {
+    let mut reporter = ui::PlainReporter::default();
+    run_with_ui(project, agents, dry_run, refresh, &mut reporter)
+}
+
+pub fn run_with_ui(
+    project: &Project,
+    agents: &[&str],
+    dry_run: bool,
+    refresh: bool,
+    reporter: &mut dyn Reporter,
+) -> Result<()> {
     if agents.is_empty()
         || agents
             .iter()
@@ -19,16 +33,17 @@ pub fn run(project: &Project, agents: &[&str], dry_run: bool, refresh: bool) -> 
         bail!("explicit known agent selection required");
     }
     let plan = build(project, agents, refresh);
-    plan.show(project);
+    plan.show(project, reporter)?;
     plan.ensure_valid()?;
     if dry_run {
-        println!("Dry run: no files written.");
+        ui::text(reporter, "Dry run: no files written.\n")?;
         return Ok(());
     }
-    plan.apply(project)?;
-    println!(
-        "Disk installation complete. Agent loading is NOT verified; check project trust and discovery/context settings in your agent."
-    );
+    plan.apply(project, reporter)?;
+    ui::text(
+        reporter,
+        "Disk installation complete. Agent loading is NOT verified; check project trust and discovery/context settings in your agent.\n",
+    )?;
     Ok(())
 }
 

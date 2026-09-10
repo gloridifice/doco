@@ -9,6 +9,7 @@ rust-version = "1.85"
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
+console = "0.16"
 fs2 = "0.4"
 pulldown-cmark = "0.13"
 regex = "1"

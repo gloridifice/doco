@@ -75,7 +75,7 @@ fn commented_tasks_and_sections_are_not_completion_evidence() {
     let s = Sandbox::new();
     s.init();
     s.ready("goal");
-    s.write("doco/changes/active/goal/work/tasks.md", "# Tasks\n\n<!--\n- [x] T001 Pretend delivered\n  - Acceptance: all good\n  - Verification: all passed\n-->\n");
+    s.write("doco/changes/active/goal/work/tasks.md", "# Tasks\n\n<!--\n- [x] 1.1 Pretend delivered\n  - Acceptance: all good\n  - Verification: all passed\n-->\n");
     s.err(&["complete", "goal"], "no executable tasks");
     s.write("doco/changes/active/goal/proposal.md", "<!--\n## Purpose\nFake purpose\n## Scope and acceptance\nFake scope\n## Result\nFake result\n-->\n");
     s.err(&["check", "goal"], "expected one ## Purpose");

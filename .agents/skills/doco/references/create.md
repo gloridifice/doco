@@ -23,7 +23,8 @@
 6. Close correctness/architecture/API/core-algorithm decisions before handing off.
    State fixed choices versus local discretion, blocking open questions,
    verification and current-document impact (explicitly none when appropriate).
-7. Write work/tasks.md: `- [ ] T001 action`, stable unique IDs, Acceptance lines,
+7. Write work/tasks.md: `- [ ] 1.1 action`, stable unique two-level positive-integer
+   IDs (`1.1`, `1.2`, `2.1`; no zero or leading zero), Acceptance lines,
    Dependencies lines where needed, and a final verification task. Dependencies
    must exist and be acyclic. Include document updates only if actually affected.
    Use relative package links; cross-change references use `doco:<stable-id>`.

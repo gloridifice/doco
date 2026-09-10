@@ -3,20 +3,22 @@
 ## 职责与依赖
 
 ```text
-main → cli (clap)
+main → cli (clap) → terminal（console）
          ├─ init → plan / entry / skill
          └─ lifecycle → context / archive
                   ↓
              check → tasks
                   ↓
-        Project + markdown + safety + templates
+        ui::Reporter + Project + markdown + safety + templates
 ```
 
-- `src/main.rs` 只处理顶层错误和退出码；`src/cli.rs` 定义参数、交互 Agent 选择与命令分发。
+- `src/main.rs` 只退出 `cli::run` 返回的状态码；`src/cli.rs` 定义参数、候选状态过滤、交互 Agent/变更选择、命令分发和顶层语义错误渲染。
+- `src/terminal/` 是二进制侧终端适配层：一次性探测各流 TTY、TERM、NO_COLOR 和尺寸，使用 console 渲染业务颜色、TTY list 和局部选择循环。选择器支持方向键、Space、Enter、Esc 和 Ctrl-C，以 RAII 恢复光标；它不保存业务状态。
+- `src/ui.rs` 是库侧输出端口，定义语义事件、流、色调和控制字符过滤。init、check、lifecycle 通过 Reporter 输出；旧公开入口使用 PlainReporter 保持非终端调用。Clap 不进入领域层。
 - `src/lib.rs` 提供项目根、稳定 ID 和从目录推导的状态模型。
 - `src/init/` 将全部目标规划为 CREATE/UPDATE/SKIP 或 CONFLICT，处理受管区块、原生 skill 安装和有限的导入去重。写入前发现任何冲突就拒绝整个安装计划。
 - `src/check/` 只检查文档结构、模板残留、任务格式、依赖和明确的阻塞/证据字段，不评价设计质量或测试真实性。
-- `src/lifecycle/` 执行创建、上下文选择和状态迁移；归档清理与一般迁移分开实现。
+- `src/lifecycle/` 执行创建、上下文选择和状态迁移；归档清理与一般迁移分开实现。CLI list 默认请求 active，并用独立开关追加 completed/archived；`list_changes_filtered` 在摘要 IO 前过滤状态，再通过 safety 读取 active/completed 任务文件、复用 check 的任务解析器生成已完成/总数，并安全遍历可见工作包、以统一查询时刻计算最新 mtime 的紧凑距今时长。Reporter 只渲染已收集的行，兼容的 `list_changes` 库入口仍返回全部状态；Project 状态模型与菜单候选查询不读取这些摘要。
 - `src/markdown.rs` 使用 CommonMark 解析器定位代码区和链接，辅以保守的标记/章节解析，不整体格式化用户文件。
 - `src/safety.rs` 集中文件归属检查、写锁、并发复核、同目录临时文件原子替换和目录操作。
 - `assets/skill/` 是唯一工作流模板来源，通过 `include_str!` 编译进二进制。不同 Agent 安装普通文件副本，不依赖运行时源码目录或符号链接。
@@ -27,7 +29,7 @@ main → cli (clap)
 
 `new` 在 `doco/tmp/` 暂存完整骨架后移动到 active；骨架故意不能通过 check。`complete` 检查任务、结果和证据字段后移动整个目录，但真实验收和当前事实同步仍由用户/Agent 完成。`reopen` 保留工作包，不擅自重置任务。
 
-`archive` 仅接受 completed，显示删除范围，并要求交互确认或 `--yes`。它保留完整 proposal，只删除 work 内预检过的文件，最后移动到 archived。工作包根目录有其他文件时拒绝归档，要求用户先明确整理。`cancel` 仅接受 active，先将明确的取消原因和已实施代码处理方式写入 proposal 结果，再按相同清理路径归档；不回滚代码。
+`archive` 仅接受 completed，先显示删除范围；`--dry-run` 在预览后停止，普通执行不再要求交互确认。它随后加锁并复核预览快照，保留完整 proposal，只删除 work 内预检过的文件，最后移动到 archived。`--yes` 仅为兼容保留，不改变流程。工作包根目录有其他文件时拒绝归档，要求用户先明确整理。`cancel` 仅接受 active，先将明确的取消原因和已实施代码处理方式写入 proposal 结果，再按相同清理路径归档；不回滚代码。
 
 ## 文件安全与失败恢复
 

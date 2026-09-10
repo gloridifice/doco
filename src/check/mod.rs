@@ -1,5 +1,8 @@
 pub mod tasks;
-use crate::{Change, Project, State, markdown, safety};
+use crate::{
+    Change, Project, State, markdown, safety,
+    ui::{self, Reporter, Tone},
+};
 use anyhow::{Result, bail};
 
 #[derive(Default)]
@@ -9,12 +12,17 @@ pub struct Report {
 }
 impl Report {
     pub fn show(&self) {
+        let mut reporter = ui::PlainReporter::default();
+        let _ = self.show_with_ui(&mut reporter);
+    }
+    pub fn show_with_ui(&self, reporter: &mut dyn Reporter) -> Result<()> {
         for issue in &self.errors {
-            println!("ERROR {issue}");
+            ui::line(reporter, Tone::Danger, "ERROR", issue)?;
         }
         for issue in &self.warnings {
-            println!("WARNING {issue}");
+            ui::line(reporter, Tone::Warning, "WARNING", issue)?;
         }
+        Ok(())
     }
     pub fn ensure(&self) -> Result<()> {
         if !self.errors.is_empty() {

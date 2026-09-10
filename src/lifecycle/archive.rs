@@ -1,10 +1,10 @@
-use crate::{Change, Project, State, check, markdown, safety, validate_id};
-use anyhow::{Context, Result, bail};
-use std::{
-    fs,
-    io::{self, IsTerminal, Write},
-    path::Path,
+use crate::{
+    Change, Project, State, check, markdown, safety,
+    ui::{self, Reporter, Tone},
+    validate_id,
 };
+use anyhow::{Context, Result, bail};
+use std::{fs, path::Path};
 
 type Cancellation<'a> = Option<(&'a str, &'a str)>;
 
@@ -96,6 +96,18 @@ pub fn archive(
     dry_run: bool,
     cancellation: Cancellation<'_>,
 ) -> Result<()> {
+    let mut reporter = ui::PlainReporter::default();
+    archive_with_ui(project, id, yes, dry_run, cancellation, &mut reporter)
+}
+
+pub fn archive_with_ui(
+    project: &Project,
+    id: &str,
+    yes: bool,
+    dry_run: bool,
+    cancellation: Cancellation<'_>,
+    reporter: &mut dyn Reporter,
+) -> Result<()> {
     validate_id(id)?;
     let change = project.resolve(id)?;
     let required = if cancellation.is_some() {
@@ -123,7 +135,7 @@ pub fn archive(
         None => original,
     };
     let report = check::proposal(&proposal, true);
-    report.show();
+    report.show_with_ui(reporter)?;
     report.ensure()?;
     for entry in fs::read_dir(&change.path)? {
         let entry = entry?;
@@ -144,49 +156,60 @@ pub fn archive(
     if destination.exists() {
         bail!("archive destination exists");
     }
-    println!("RETAIN {} (complete proposal)", proposal_path.display());
+    ui::line(
+        reporter,
+        Tone::Info,
+        "RETAIN",
+        &format!("{} (complete proposal)", proposal_path.display()),
+    )?;
     if cancellation.is_some() {
-        println!(
-            "UPDATE proposal Result with cancellation reason and implemented-code disposition:\n{}",
-            markdown::result_section(&proposal).unwrap().content
-        );
+        ui::line(
+            reporter,
+            Tone::Warning,
+            "UPDATE",
+            &format!(
+                "proposal Result with cancellation reason and implemented-code disposition:\n{}",
+                markdown::result_section(&proposal).unwrap().content
+            ),
+        )?;
     }
     for entry in &before {
         if entry.path.starts_with(&work) {
-            println!(
-                "DELETE {}{}",
-                entry.path.display(),
-                if entry.directory { "/" } else { "" }
-            );
+            ui::line(
+                reporter,
+                Tone::Danger,
+                "DELETE",
+                &format!(
+                    "{}{}",
+                    entry.path.display(),
+                    if entry.directory { "/" } else { "" }
+                ),
+            )?;
         }
     }
     if !work.exists() {
-        println!(
-            "RECOVERY work/ already absent; retry will finish the move without reconstructing discarded material."
-        );
+        ui::line(
+            reporter,
+            Tone::Warning,
+            "RECOVERY",
+            "work/ already absent; retry will finish the move without reconstructing discarded material.",
+        )?;
     }
-    println!(
-        "MOVE {} -> {}",
-        change.path.display(),
-        destination.display()
-    );
-    println!("No code rollback, Git history rewrite, or unrelated tmp cleanup.");
+    ui::line(
+        reporter,
+        Tone::Info,
+        "MOVE",
+        &format!("{} -> {}", change.path.display(), destination.display()),
+    )?;
+    ui::text(
+        reporter,
+        "No code rollback, Git history rewrite, or unrelated tmp cleanup.\n",
+    )?;
     if dry_run {
-        println!("Dry run: no files written or deleted.");
+        ui::text(reporter, "Dry run: no files written or deleted.\n")?;
         return Ok(());
     }
-    if !yes {
-        if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
-            bail!("destructive operation requires --yes in non-interactive mode; nothing deleted");
-        }
-        print!("Delete the listed work materials permanently? Type {id} to confirm: ");
-        io::stdout().flush()?;
-        let mut answer = String::new();
-        io::stdin().read_line(&mut answer)?;
-        if answer.trim() != id {
-            bail!("not confirmed; nothing deleted");
-        }
-    }
+    let _ = yes; // Retained as a source/CLI compatibility flag; confirmation is no longer required.
     let _lock = safety::Lock::acquire(project.root())?;
     let current = project.resolve(id)?;
     if current.state != change.state || safety::tree(project.root(), &change.path)? != before {
@@ -201,10 +224,15 @@ pub fn archive(
             &snapshot,
             proposal.as_bytes(),
         )?;
-        println!(
-            "APPLIED cancellation result; source remains {} until cleanup and move succeed",
-            change.path.display()
-        );
+        ui::line(
+            reporter,
+            Tone::Success,
+            "APPLIED",
+            &format!(
+                "cancellation result; source remains {} until cleanup and move succeed",
+                change.path.display()
+            ),
+        )?;
     }
     // Remove only preflighted entries, bottom-up. Newly added files make rmdir fail
     // instead of being silently swept up by a broad recursive removal.
@@ -223,7 +251,12 @@ pub fn archive(
                 change.state
             );
         }
-        println!("DELETED {}", entry.path.display());
+        ui::line(
+            reporter,
+            Tone::Danger,
+            "DELETED",
+            &entry.path.display().to_string(),
+        )?;
     }
     if safety::text(project.root(), &proposal_path)? != proposal {
         bail!(
@@ -253,13 +286,16 @@ pub fn archive(
             destination.display()
         );
     }
-    println!(
-        "{} {id} -> archived; only proposal.md retained.",
-        if cancellation.is_some() {
-            "Cancelled"
-        } else {
-            "Archived"
-        }
-    );
+    ui::text(
+        reporter,
+        &format!(
+            "{} {id} -> archived; only proposal.md retained.\n",
+            if cancellation.is_some() {
+                "Cancelled"
+            } else {
+                "Archived"
+            }
+        ),
+    )?;
     Ok(())
 }

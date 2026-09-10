@@ -42,10 +42,11 @@ pub fn is_none(value: &str) -> bool {
 }
 pub fn parse(text: &str) -> Tasks {
     let mut out = Tasks::default();
-    let task_pattern = regex::Regex::new(r"^\s*[-*+] \[([ x])\] (T[0-9]{3,})\s+(.+)$").unwrap();
+    let task_pattern =
+        regex::Regex::new(r"^\s*[-*+] \[([ x])\] ([1-9][0-9]*\.[1-9][0-9]*)\s+(.+)$").unwrap();
     let possible = regex::Regex::new(r"^\s*[-*+]\s+\[[^\]]*\]").unwrap();
     let deps_split = regex::Regex::new(r"[,，、\s]+").unwrap();
-    let id_pattern = regex::Regex::new(r"^T[0-9]{3,}$").unwrap();
+    let id_pattern = regex::Regex::new(r"^[1-9][0-9]*\.[1-9][0-9]*$").unwrap();
     for (_, line) in markdown::content_lines(text) {
         if let Some(cap) = task_pattern.captures(line) {
             out.items.push(Task {
@@ -58,7 +59,7 @@ pub fn parse(text: &str) -> Tasks {
         }
         if possible.is_match(line) {
             out.errors.push(format!(
-                "invalid task (expected '- [ ] T001 action' or '- [x] T001 action'): {line}"
+                "invalid task (expected '- [ ] 1.1 action' or '- [x] 1.1 action'): {line}"
             ));
         }
         if let Some((key, value)) = field(line) {

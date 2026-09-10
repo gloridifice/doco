@@ -1,6 +1,7 @@
 # 当前文档
 
 - [架构](architecture.md)：模块职责、持久状态、文件安全与恢复边界。
+- [CLI 输出与交互](cli.md)：颜色、TTY 布局、菜单、退出码及破坏性命令行为。
 - [文档格式](document-format.md)：CLI 能机械识别的章节、任务和引用格式。
 - 精确命令参数以 `doco --help`、源码及集成测试为准；工作流规则由 [随工具发布的 skill](../assets/skill/SKILL.md) 提供。
 

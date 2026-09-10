@@ -3,7 +3,7 @@ use std::{
     collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::{Command, Output, Stdio},
 };
 use tempfile::TempDir;
 
@@ -27,14 +27,25 @@ impl Sandbox {
     pub fn read(&self, relative: &str) -> String {
         fs::read_to_string(self.path(relative)).unwrap()
     }
-    pub fn run(&self, args: &[&str]) -> (bool, String) {
-        let output = Command::new(env!("CARGO_BIN_EXE_doco"))
+    pub fn output(&self, args: &[&str]) -> Output {
+        self.output_with_env(args, &[])
+    }
+    pub fn output_with_env(&self, args: &[&str], environment: &[(&str, &str)]) -> Output {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_doco"));
+        command
             .arg("--root")
             .arg(self.dir.path())
             .args(args)
             .stdin(Stdio::null())
-            .output()
-            .unwrap();
+            .env_remove("NO_COLOR")
+            .env_remove("TERM");
+        for (name, value) in environment {
+            command.env(name, value);
+        }
+        command.output().unwrap()
+    }
+    pub fn run(&self, args: &[&str]) -> (bool, String) {
+        let output = self.output(args);
         (
             output.status.success(),
             format!(
@@ -65,7 +76,7 @@ impl Sandbox {
         self.ok(&["new", id]);
         self.write(&format!("doco/changes/active/{id}/proposal.md"), "# Bounded queue\n\n## Purpose\nAvoid unbounded event memory growth.\n\n## Scope and acceptance\nBound storage at two events; preserve FIFO and return Full on overflow.\n\n## Result\nDelivered bounded FIFO; queue boundary tests passed. No contract or architecture changes outside this module.\n");
         self.write(&format!("doco/changes/active/{id}/work/implement.md"), "# Design\n\n## 1. Baseline and goals\nThe fixture represents an empty project; add a standalone queue.\n\n## 2. Overall approach\nThe caller owns a VecDeque and never blocks.\n\n## 3. APIs and data model\npush(Event) returns Result<(), Full>; pop() returns Option<Event>. State belongs to the caller.\n\n## 4. Algorithms and rules\nReject a push at length two; pop from the front. No threads or persistence.\n\n## 5. Fixed decisions and discretion\nCapacity, order and overflow are fixed. Local names are discretionary.\nBlocked: none\n\n## 6. Verification and documentation impact\nTest zero, one, two and three pushes, then FIFO pops. Current architecture impact: none in this fixture.\n");
-        self.write(&format!("doco/changes/active/{id}/work/tasks.md"), "# Tasks\n\n- [x] T001 Implement bounded queue\n  - Acceptance: FIFO and capacity two are enforced.\n  - Verification: fixture queue boundary checks passed.\n\n- [x] T002 Run regression checks\n  - Dependencies: T001\n  - Acceptance: expected overflow and FIFO behavior verified.\n  - Verification: fixture regression passed.\n");
+        self.write(&format!("doco/changes/active/{id}/work/tasks.md"), "# Tasks\n\n- [x] 1.1 Implement bounded queue\n  - Acceptance: FIFO and capacity two are enforced.\n  - Verification: fixture queue boundary checks passed.\n\n- [x] 2.1 Run regression checks\n  - Dependencies: 1.1\n  - Acceptance: expected overflow and FIFO behavior verified.\n  - Verification: fixture regression passed.\n");
     }
     pub fn files(&self) -> BTreeMap<PathBuf, Vec<u8>> {
         fn walk(root: &Path, at: &Path, out: &mut BTreeMap<PathBuf, Vec<u8>>) {
