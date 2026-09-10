@@ -42,9 +42,18 @@ fn selects_only_requested_agents_and_deduplicates() {
             (claude, ".claude/skills/doco"),
         ] {
             if enabled {
+                assert!(
+                    templates::FILES
+                        .iter()
+                        .any(|(file, _)| *file == "references/migrate.md")
+                );
                 for (file, content) in templates::FILES {
                     assert_eq!(s.read(&format!("{directory}/{file}")), *content);
                 }
+                assert!(
+                    s.read(&format!("{directory}/references/migrate.md"))
+                        .contains("# Migrate existing documentation")
+                );
             }
         }
         let before = s.files();

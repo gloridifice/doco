@@ -6,9 +6,10 @@ use doco::templates;
 fn skill_bom_is_preserved_during_idempotent_install_and_refresh() {
     let s = Sandbox::new();
     for (file, content) in templates::FILES {
+        let crlf = content.replace("\r\n", "\n").replace('\n', "\r\n");
         s.write(
             &format!(".agents/skills/doco/{file}"),
-            &format!("\u{feff}{}", content.replace('\n', "\r\n")),
+            &format!("\u{feff}{crlf}"),
         );
     }
     s.init();

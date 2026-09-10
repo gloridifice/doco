@@ -137,7 +137,7 @@ fn build(project: &Project, agents: &[&str], refresh: bool) -> Plan {
                 let content = plan.effective_text(project, &full)?.ok_or_else(|| {
                     anyhow::anyhow!("imported navigation references missing {full}")
                 })?;
-                if crate::markdown::normalize(&content) != *generated {
+                if crate::markdown::normalize(&content) != crate::markdown::normalize(generated) {
                     bail!("imported skill {full} is not a verified compatible bundle");
                 }
             }

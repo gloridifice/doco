@@ -12,12 +12,13 @@ pub fn update(old: Option<&str>, generated: &str, refresh: bool) -> Result<Strin
     let Some(old) = old else {
         return Ok(generated.to_string());
     };
-    if markdown::normalize(old) == generated {
+    let normalized = markdown::normalize(generated);
+    if markdown::normalize(old) == normalized {
         return Ok(old.to_string());
     }
-    let unmarked = generated.replace(&format!("{}\n", templates::MARKER), "");
+    let unmarked = normalized.replace(&format!("{}\n", templates::MARKER), "");
     if markdown::normalize(old) == unmarked {
-        return Ok(markdown::styled(generated, old));
+        return Ok(markdown::styled(&normalized, old));
     }
     let managed = markdown::body_lines(old).iter().any(|(_, line)| {
         regex::Regex::new(r"^<!-- doco:managed template=v[0-9]+ -->$")
@@ -30,12 +31,12 @@ pub fn update(old: Option<&str>, generated: &str, refresh: bool) -> Result<Strin
     if !refresh {
         bail!(
             "managed file differs; --refresh explicitly overwrites this generated file, including manual edits\n{}",
-            similar::TextDiff::from_lines(old, &markdown::styled(generated, old))
+            similar::TextDiff::from_lines(old, &markdown::styled(&normalized, old))
                 .unified_diff()
                 .context_radius(2)
         );
     }
-    Ok(markdown::styled(generated, old))
+    Ok(markdown::styled(&normalized, old))
 }
 
 pub fn install(plan: &mut Plan, project: &Project, directory: &str, refresh: bool) {
@@ -75,9 +76,31 @@ pub fn compatible(project: &Project, directory: &str) -> Result<bool> {
             return Ok(false);
         };
         let old = safety::decode(&snapshot.bytes)?;
-        if markdown::normalize(&old) != *generated {
+        if markdown::normalize(&old) != markdown::normalize(generated) {
             return Ok(false);
         }
     }
     Ok(true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::update;
+    use crate::templates::MARKER;
+
+    #[test]
+    fn generated_line_endings_do_not_create_false_conflicts() {
+        let generated = format!("{MARKER}\r\n# Skill\r\n");
+        let installed = format!("{MARKER}\n# Skill\n");
+        assert_eq!(
+            update(Some(&installed), &generated, false).unwrap(),
+            installed
+        );
+
+        let unmarked = "# Skill\n";
+        assert_eq!(
+            update(Some(unmarked), &generated, false).unwrap(),
+            installed
+        );
+    }
 }

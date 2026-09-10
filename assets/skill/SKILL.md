@@ -1,6 +1,6 @@
 ---
 name: doco
-description: Manage project documentation and doco changes. Use when creating, executing, reviewing, completing, or archiving a doco change, or maintaining the project's current technical documents.
+description: Manage project documentation and doco changes. Use when migrating existing project documentation into doco; creating, executing, reviewing, completing, or archiving a doco change; or maintaining the project's current technical documents.
 ---
 <!-- doco:managed template=v1 -->
 
@@ -12,6 +12,7 @@ For documentation-only work, follow these current-document rules without
 creating a change unless the user requests change tracking.
 
 Read the reference for the requested action:
+- Migrate existing documentation: `references/migrate.md`
 - Create: `references/create.md`
 - Execute: `references/execute.md`
 - Review or complete: `references/complete.md`

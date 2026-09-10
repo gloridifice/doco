@@ -2,6 +2,10 @@ pub const MARKER: &str = "<!-- doco:managed template=v1 -->";
 pub const FILES: &[(&str, &str)] = &[
     ("SKILL.md", include_str!("../assets/skill/SKILL.md")),
     (
+        "references/migrate.md",
+        include_str!("../assets/skill/references/migrate.md"),
+    ),
+    (
         "references/create.md",
         include_str!("../assets/skill/references/create.md"),
     ),
