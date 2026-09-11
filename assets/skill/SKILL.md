@@ -3,7 +3,7 @@ name: doco
 description: Manage project documentation and doco changes. Use when migrating existing project documentation into doco; creating, executing, reviewing, completing, or archiving a doco change; or maintaining the project's current technical documents.
 ---
 <!-- doco:managed template=v1 -->
-<!-- doco:skill version=v2 -->
+<!-- doco:skill version=v3 -->
 
 # Doco
 

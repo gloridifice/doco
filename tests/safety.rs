@@ -12,7 +12,7 @@ fn hardlinked_entries_and_skill_files_are_not_overwritten() {
         let destination = s.path(path);
         fs::create_dir_all(destination.parent().unwrap()).unwrap();
         fs::hard_link(external.path("original"), &destination).unwrap();
-        s.err(&["init", "--agent", "codex", "--refresh"], "hard-linked");
+        s.err(&["init", "--agent", "most", "--refresh"], "hard-linked");
         assert_eq!(external.read("original"), "original bytes");
         assert!(!s.path("doco").exists());
     }
@@ -72,7 +72,7 @@ fn refuses_linked_parent_directories_before_init_writes() {
         let outside = Sandbox::new();
         outside.write("keep", "external");
         link_dir(outside.dir.path(), &s.path(path));
-        s.err(&["init", "--agent", "codex"], "CONFLICT");
+        s.err(&["init", "--agent", "most"], "CONFLICT");
         assert_eq!(outside.files().len(), 1);
         assert_eq!(outside.read("keep"), "external");
     }

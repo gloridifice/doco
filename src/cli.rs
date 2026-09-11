@@ -7,6 +7,7 @@ use clap::{CommandFactory, Parser, Subcommand, ValueEnum, error::ErrorKind};
 use doco::{
     Change, Project, State, init, lifecycle,
     ui::{self, Event, Reporter, Tone},
+    update,
 };
 use std::path::PathBuf;
 
@@ -24,10 +25,10 @@ struct Cli {
     /// Business-output color policy
     #[arg(long, global = true, value_enum, default_value_t = ColorMode::Auto)]
     color: ColorMode,
-    /// Allow prompts that supply a missing change ID
+    /// Allow supported terminal prompts
     #[arg(long, global = true, conflicts_with = "no_interactive")]
     interactive: bool,
-    /// Disable all prompts; destructive commands then require --yes
+    /// Disable all terminal prompts
     #[arg(long, global = true)]
     no_interactive: bool,
     #[command(subcommand)]
@@ -35,18 +36,26 @@ struct Cli {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-enum Agent {
-    Codex,
+enum Integration {
+    Most,
     Claude,
-    Pi,
 }
 
 #[derive(Subcommand)]
 enum Command {
     /// Install project-local agent workflows without overwriting project facts
     Init {
+        /// Integration target: most (.agents/AGENTS.md) or claude (.claude/CLAUDE.md)
         #[arg(long, value_enum)]
-        agent: Vec<Agent>,
+        agent: Vec<Integration>,
+        #[arg(long)]
+        dry_run: bool,
+        /// Replace only recognized doco-managed integration content
+        #[arg(long)]
+        refresh: bool,
+    },
+    /// Refresh installed doco skill bundles and managed instruction entries
+    Update {
         #[arg(long)]
         dry_run: bool,
         /// Replace only recognized doco-managed integration content
@@ -194,14 +203,12 @@ fn execute(
             )?;
             if agent.is_empty() {
                 if !can_prompt {
-                    bail!(
-                        "non-interactive init requires --agent codex|claude|pi; no files written"
-                    );
+                    bail!("non-interactive init requires --agent most|claude; no files written");
                 }
-                agent = match terminal_prompter.select_agents()? {
+                agent = match terminal_prompter.select_integrations()? {
                     PromptOutcome::Answer(indices) => indices
                         .into_iter()
-                        .map(|index| [Agent::Codex, Agent::Claude, Agent::Pi][index])
+                        .map(|index| [Integration::Most, Integration::Claude][index])
                         .collect(),
                     PromptOutcome::Cancelled => return ui::cancelled(),
                 };
@@ -211,12 +218,14 @@ fn execute(
             let ids: Vec<&str> = agent
                 .iter()
                 .map(|a| match a {
-                    Agent::Codex => "codex",
-                    Agent::Claude => "claude",
-                    Agent::Pi => "pi",
+                    Integration::Most => "most",
+                    Integration::Claude => "claude",
                 })
                 .collect();
             init::run_with_ui(&project, &ids, dry_run, refresh, &mut reporter)
+        }
+        Command::Update { dry_run, refresh } => {
+            update::run_with_ui(&project, dry_run, refresh, &mut reporter)
         }
         Command::New { id, proposal_only } => lifecycle::new_change_in_mode_with_ui(
             &project,
@@ -328,7 +337,10 @@ impl Cli {
             | Command::Archive { id, .. }
             | Command::Cancel { id, .. }
             | Command::Context { id, .. } => id.is_none(),
-            Command::Init { .. } | Command::New { .. } | Command::List { .. } => false,
+            Command::Init { .. }
+            | Command::Update { .. }
+            | Command::New { .. }
+            | Command::List { .. } => false,
         };
         if missing && !self.interactive {
             return Err(Cli::command().error(
@@ -432,6 +444,24 @@ mod tests {
     fn color_accepts_global_positions() {
         assert!(Cli::try_parse_from(["doco", "--color", "never", "list"]).is_ok());
         assert!(Cli::try_parse_from(["doco", "list", "--color", "always"]).is_ok());
+    }
+
+    #[test]
+    fn init_has_two_integration_values_and_update_needs_no_selection() {
+        for value in ["most", "claude"] {
+            assert!(Cli::try_parse_from(["doco", "init", "--agent", value]).is_ok());
+        }
+        for old in ["codex", "pi"] {
+            assert_eq!(
+                Cli::try_parse_from(["doco", "init", "--agent", old])
+                    .err()
+                    .unwrap()
+                    .kind(),
+                ErrorKind::InvalidValue
+            );
+        }
+        assert!(Cli::try_parse_from(["doco", "update"]).is_ok());
+        assert!(Cli::try_parse_from(["doco", "update", "--dry-run", "--refresh"]).is_ok());
     }
 
     #[test]

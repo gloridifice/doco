@@ -4,6 +4,7 @@ use std::ops::Range;
 
 const START: &str = "<!-- DOCO:START -->";
 const END: &str = "<!-- DOCO:END -->";
+const ENTRY_VERSION: u64 = 1;
 
 pub fn block_range(text: &str) -> Result<Option<Range<usize>>> {
     let lines = markdown::body_lines(text);
@@ -31,7 +32,83 @@ fn suspect(text: &str) -> bool {
     })
 }
 fn generated_block(skill: &str) -> String {
-    format!("{START}\n{}{END}\n", templates::navigation(skill))
+    format!(
+        "{START}\n<!-- doco:entry template=v{ENTRY_VERSION} -->\n{}{END}\n",
+        templates::navigation(skill)
+    )
+}
+
+fn parsed_version(block: &str) -> Option<u64> {
+    let candidates: Vec<_> = markdown::body_lines(block)
+        .into_iter()
+        .map(|(_, line)| line.trim())
+        .filter(|line| line.starts_with("<!-- doco:entry"))
+        .collect();
+    let [candidate] = candidates.as_slice() else {
+        return None;
+    };
+    let captures = regex::Regex::new(r"^<!-- doco:entry template=v(0|[1-9][0-9]*) -->$")
+        .unwrap()
+        .captures(candidate)?;
+    captures.get(1)?.as_str().parse().ok()
+}
+
+fn unmarked_range(text: &str, skill: &str) -> Result<Option<Range<usize>>> {
+    let plain = markdown::styled(&templates::navigation(skill), text);
+    let body = markdown::body_lines(text);
+    let matches: Vec<_> = text
+        .match_indices(plain.trim_end_matches(['\r', '\n']))
+        .filter(|(start, matched)| {
+            body.iter().any(|(range, _)| range.start == *start)
+                && text
+                    .as_bytes()
+                    .get(start + matched.len())
+                    .is_none_or(|byte| matches!(byte, b'\r' | b'\n'))
+        })
+        .collect();
+    if matches.len() > 1 {
+        bail!("multiple unmarked doco navigation bodies; manual merge required");
+    }
+    let Some((start, matched)) = matches.first() else {
+        if suspect(text) {
+            bail!("suspected custom doco workflow; preserve original and merge manually");
+        }
+        return Ok(None);
+    };
+    let range = *start..*start + matched.len();
+    let mut outside = text.to_string();
+    outside.replace_range(range.clone(), "");
+    if suspect(&outside) {
+        bail!("additional custom doco workflow; manual merge required");
+    }
+    Ok(Some(range))
+}
+
+pub(crate) fn installed(text: &str, skill: &str) -> Result<bool> {
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+    markdown::safe_append(text)?;
+    if let Some(range) = block_range(text)? {
+        let known = [
+            ".agents/skills/doco",
+            ".claude/skills/doco",
+            ".pi/skills/doco",
+            ".codex/skills/doco",
+        ];
+        let referenced: Vec<_> = known
+            .into_iter()
+            .filter(|path| text[range.clone()].contains(path))
+            .collect();
+        if referenced.len() > 1 {
+            bail!("managed doco entry references multiple skill directories");
+        }
+        if let Some(referenced) = referenced.first()
+            && *referenced != skill
+        {
+            bail!("managed doco entry references {referenced}, expected {skill}");
+        }
+        return Ok(true);
+    }
+    Ok(unmarked_range(text, skill)?.is_some())
 }
 
 pub fn update(existing: Option<&str>, title: &str, skill: &str, refresh: bool) -> Result<String> {
@@ -57,7 +134,8 @@ pub fn update(existing: Option<&str>, title: &str, skill: &str, refresh: bool) -
         if markdown::normalize(&text[range.clone()]).trim_end() == block.trim_end() {
             return Ok(text.to_string());
         }
-        if !refresh {
+        let upgrade = ENTRY_VERSION > parsed_version(&text[range.clone()]).unwrap_or(0);
+        if !refresh && !upgrade {
             bail!(
                 "managed navigation differs; review diff and use --refresh to replace this block only\n{}",
                 similar::TextDiff::from_lines(&text[range], &markdown::styled(&block, text))
@@ -69,35 +147,15 @@ pub fn update(existing: Option<&str>, title: &str, skill: &str, refresh: bool) -
         return Ok(output);
     }
     // Adopt a complete known unmarked body, but never a fenced example.
-    let plain = markdown::styled(&templates::navigation(skill), text);
-    let body = markdown::body_lines(text);
-    let matches: Vec<_> = text
-        .match_indices(plain.trim_end_matches(['\r', '\n']))
-        .filter(|(start, matched)| {
-            body.iter().any(|(r, _)| r.start == *start)
-                && text
-                    .as_bytes()
-                    .get(start + matched.len())
-                    .is_none_or(|b| matches!(b, b'\r' | b'\n'))
-        })
-        .collect();
-    if matches.len() > 1 {
-        bail!("multiple unmarked doco navigation bodies; manual merge required");
-    }
-    if let Some((start, matched)) = matches.first() {
-        let end = start + matched.len();
-        let mut outside = text.to_string();
-        outside.replace_range(*start..end, "");
-        if suspect(&outside) {
-            bail!("additional custom doco workflow; manual merge required");
-        }
+    if let Some(range) = unmarked_range(text, skill)? {
         let nl = markdown::newline(text);
+        let matched = &text[range.clone()];
+        let replacement = format!(
+            "{START}{nl}<!-- doco:entry template=v{ENTRY_VERSION} -->{nl}{matched}{nl}{END}"
+        );
         let mut output = text.to_string();
-        output.replace_range(*start..end, &format!("{START}{nl}{matched}{nl}{END}"));
+        output.replace_range(range, &replacement);
         return Ok(output);
-    }
-    if suspect(text) {
-        bail!("suspected custom doco workflow; preserve original and merge manually");
     }
     let nl = markdown::newline(text);
     let separator = if text.is_empty() || text.ends_with(&format!("{nl}{nl}")) {
@@ -142,15 +200,43 @@ pub fn visible_skill(text: &str) -> Result<Option<String>> {
         }
         return Ok(None);
     };
-    for path in [
-        ".agents/skills/doco",
-        ".pi/skills/doco",
-        ".claude/skills/doco",
-    ] {
+    for path in [".agents/skills/doco", ".claude/skills/doco"] {
         if markdown::normalize(&text[range.clone()]).trim_end() == generated_block(path).trim_end()
         {
             return Ok(Some(path.to_string()));
         }
     }
     bail!("imported doco navigation is not a recognized valid template; manual review required")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_invalid_and_duplicate_entry_versions_upgrade_from_v0() {
+        let skill = ".agents/skills/doco";
+        let generated = generated_block(skill);
+        for old in [
+            generated.replace("<!-- doco:entry template=v1 -->\n", ""),
+            generated.replace("template=v1", "template=invalid"),
+            generated.replace(
+                "<!-- doco:entry template=v1 -->",
+                "<!-- doco:entry template=v1 -->\n<!-- doco:entry template=v1 -->",
+            ),
+        ] {
+            assert_eq!(
+                update(Some(&old), "Project instructions", skill, false).unwrap(),
+                generated
+            );
+        }
+    }
+
+    #[test]
+    fn installed_requires_a_managed_or_complete_known_navigation() {
+        let skill = ".agents/skills/doco";
+        assert!(installed(&generated_block(skill), skill).unwrap());
+        assert!(installed(&templates::navigation(skill), skill).unwrap());
+        assert!(!installed("# Custom instructions\n", skill).unwrap());
+    }
 }

@@ -24,24 +24,28 @@ UPDATED 取工作包根目录及全部后代中最新的文件系统修改时间
 
 仅 proposal 模式是持久格式选择，不表示所有小型代码修改都必须创建变更。doco 归档不保存实现历史；普通行为修复和实现细节修改可以直接进行，Git、PR 或项目发布记录负责实现历史。无论是否创建变更，已记录的当前架构或规范事实发生变化时仍需同步当前文档。
 
-## 初始化与 skill 更新
+## 初始化与集成更新
 
-根 `SKILL.md` 以独立的 `v<非负整数>` 标记记录整个 doco skill bundle 的版本，当前版本为 `v2`；references 和模板文件不重复记录该版本。已安装版本缺失或无法唯一识别时按 `v0` 比较，但版本判断不授予文件归属：没有 doco 受管标记的同名文件仍然冲突，即使传入 `--refresh` 也不覆盖。
+`init --agent` 只有两个正式值：`most` 将 skill 安装到 `.agents/skills/doco` 并在 `AGENTS.md` 写受管入口，`claude` 将 skill 安装到 `.claude/skills/doco` 并在 `CLAUDE.md` 写受管入口；两项可组合且重复项会去重。旧 `codex`、`pi` 参数不再接受，`.pi/skills/doco` 和 `.codex/skills/doco` 也不再是安装目标；选择 Most agents 时发现这些旧版或替代路径会要求先人工迁移。
 
-CLI 内置版本严格高于已安装版本时，普通 `init` 无需 `--refresh` 即刷新该目录下全部已知 skill 文件，保留未知文件。相同版本的受管内容差异仍要求 `--refresh`；更高的已安装版本不会被普通 init 自动降级。显式 `--refresh` 保留覆盖受管内容及强制降级的能力。
+根 `SKILL.md` 以独立的 `v<非负整数>` 标记记录整个 doco skill bundle 的版本，当前版本为 `v3`；references 和模板文件不重复记录该版本。AGENTS/CLAUDE 的 DOCO 块在 START 后以唯一 `<!-- doco:entry template=v1 -->` 记录入口模板版本。已安装版本缺失、格式错误、重复或无法解析时按 `v0` 比较，但版本判断不授予文件归属：没有 doco 受管标记的同名 skill 仍然冲突，入口缺失或边界歧义也不能用 `--refresh` 强行取得归属。
 
-每个 skill 目录独立提交：先写 references 和模板，最后写根 `SKILL.md`。可捕获的组内写入失败会逆序恢复本次已改文件，并删除本次新建的文件和空目录；成功回滚输出 `ROLLED BACK` 并以失败状态退出。回滚步骤失败或检测到外部并发修改时输出 `ROLLBACK FAILED` 和未恢复路径，不覆盖无法确认的当前内容。该保证不跨不同 Agent skill 目录、项目文档或导航文件，也不覆盖强制终止、断电和持续文件系统故障。
+CLI 内置版本严格高于已安装版本时，普通 `init` 或 `update` 无需 `--refresh` 即刷新对应受管内容。相同版本的内容差异仍要求 `--refresh`；更高的已安装版本不会被普通运行降级。显式 `--refresh` 保留覆盖受管内容及强制降级的能力。入口更新只替换 DOCO 块，块外字节保持不变。
+
+`doco update` 不接受 Agent 参数，也不创建集成；它要求项目已初始化，并检测 `.agents`/AGENTS 与 `.claude`/CLAUDE 两个固定组合。完整组合会全部更新；skill 与受管入口只存在一侧、入口引用目录不一致、同名内容不受管、发现旧路径或两个组合都不存在时失败并提示使用 `init` 或人工迁移。只有 `CLAUDE.md` 的 `@AGENTS.md` 导入时，Claude 复用 Most agents，不算独立 Claude 安装；独立 Claude skill 与该导入并存时拒绝。`update --dry-run` 只显示计划，零写入。
+
+每个 skill 目录独立提交：先写 references 和模板，最后写根 `SKILL.md`。可捕获的组内写入失败会逆序恢复本次已改文件，并删除本次新建的文件和空目录；成功回滚输出 `ROLLED BACK` 并以失败状态退出。入口文件在 bundle 之后独立写入，不参与该回滚组。回滚失败或检测到外部并发修改时输出 `ROLLBACK FAILED` 和未恢复路径，不覆盖无法确认归属的当前内容。该保证不跨不同 skill 目录、入口文件或项目文档，也不覆盖强制终止、断电和持续文件系统故障。
 
 ## 交互范围
 
 `--interactive` 和 `--no-interactive` 互斥。只有以下情况会打开菜单：
 
-- `init` 未提供 `--agent`：在可交互终端多选 Codex、Claude Code、Pi。
+- `init` 未提供 `--agent`：在可交互终端多选 Most agents（`.agents` / `AGENTS.md`）和 Claude（`.claude` / `CLAUDE.md`）。
 - `context`、`check`、`complete`、`archive`、`reopen`、`cancel` 省略变更 ID 且显式提供 `--interactive`：按命令所需生命周期状态选择已有变更。
 
-`new` 始终要求显式 ID，不提供交互输入。明确传入已有变更 ID 时不打开菜单，即使同时存在 `--interactive`。`--yes` 不选择目标或补充参数。
+`update`、`new` 始终不提供交互输入。明确传入已有变更 ID 时不打开菜单，即使同时存在 `--interactive`。`--yes` 不选择目标或补充参数。
 
-菜单使用方向键移动、Space 切换多选、Enter 提交、Esc 或 Ctrl-C 取消。单一候选也必须 Enter 提交，不会自动执行。每页最多显示 10 项，并根据终端高度缩小。菜单写 stderr，不从重定向 stdin 读取；交互要求 stdin、stdout、stderr 都是 TTY 且 `TERM` 不为 `dumb`。菜单取消退出 130，业务或 IO 错误退出 1，Clap 参数错误退出 2。
+菜单使用方向键移动、Space 切换多选、Esc、Ctrl-C 或 q 取消。多选菜单按 Enter 时先把当前高亮项纳入选择，再立即提交全部已选择项；已选择的当前项不会被反选，先前用 Space 选择的项会保留。单选菜单按 Enter 直接提交当前项。单一候选也必须 Enter 提交，不会自动执行。每页最多显示 10 项，并根据终端高度缩小。菜单写 stderr，不从重定向 stdin 读取；交互要求 stdin、stdout、stderr 都是 TTY 且 `TERM` 不为 `dumb`。菜单取消退出 130，业务或 IO 错误退出 1，Clap 参数错误退出 2。
 
 建议 CI 和 Agent 自动化传入所有参数并使用 `--no-interactive --color never`。
 

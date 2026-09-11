@@ -23,7 +23,8 @@ implementation detail or task logs into the historical summary.
 Run `doco check <id>`. Only when semantic review is complete and completion was
 requested, run `doco complete <id>`. CLI success means mechanical checks and the
 whole-directory move succeeded; it does not certify semantic acceptance. completed/
-retains the complete work package as a delivery snapshot, not current truth.
+retains the complete work package as a delivery snapshot, not current truth. After
+`doco complete`, no need to re-list or read completed/ to confirm the move.
 Completion does not commit, merge or publish and does not authorize archiving.
 
 If corrections are needed later, use `doco reopen <id>` with approval, then reset

@@ -6,6 +6,7 @@ pub mod package;
 pub mod safety;
 pub mod templates;
 pub mod ui;
+pub mod update;
 
 pub use package::{PROPOSAL_ONLY_MARKER, PackageMode, package_mode};
 

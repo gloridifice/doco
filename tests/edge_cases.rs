@@ -18,7 +18,7 @@ fn skill_bom_is_preserved_during_idempotent_install_and_refresh() {
     assert_eq!(s.files(), before);
     let file = ".agents/skills/doco/references/create.md";
     s.write(file, &format!("{}\r\nUser customization\r\n", s.read(file)));
-    s.ok(&["init", "--agent", "codex", "--refresh"]);
+    s.ok(&["init", "--agent", "most", "--refresh"]);
     assert!(s.read(file).starts_with('\u{feff}'));
     assert!(!s.read(file).replace("\r\n", "").contains('\n'));
 }
@@ -60,7 +60,7 @@ fn bom_at_managed_block_and_unmarked_body_is_preserved() {
             .read("AGENTS.md")
             .replace("Perform only", "Perform exactly");
         s.write("AGENTS.md", &edited);
-        s.ok(&["init", "--agent", "codex", "--refresh"]);
+        s.ok(&["init", "--agent", "most", "--refresh"]);
         assert!(s.read("AGENTS.md").starts_with('\u{feff}'));
     }
 }
@@ -68,7 +68,7 @@ fn bom_at_managed_block_and_unmarked_body_is_preserved() {
 fn unclosed_frontmatter_is_a_no_write_conflict() {
     let s = Sandbox::new();
     s.write("AGENTS.md", "---\ntitle: project\n");
-    s.err(&["init", "--agent", "codex"], "unclosed front matter");
+    s.err(&["init", "--agent", "most"], "unclosed front matter");
     assert!(!s.path("doco").exists());
 }
 #[test]
@@ -98,14 +98,13 @@ fn html_work_links_block_archive() {
     s.err(&["archive", "goal", "--yes"], "references work");
 }
 #[test]
-fn adding_codex_does_not_silently_duplicate_a_prior_pi_installation() {
+fn most_agents_does_not_silently_adopt_a_legacy_pi_installation() {
     let s = Sandbox::new();
     for (file, content) in templates::FILES {
         s.write(&format!(".pi/skills/doco/{file}"), content);
     }
-    s.ok(&["init", "--agent", "pi"]);
     let before = s.files();
-    s.err(&["init", "--agent", "codex"], "migrate");
+    s.err(&["init", "--agent", "most"], "migrate");
     assert_eq!(s.files(), before);
 }
 #[cfg(windows)]
@@ -145,7 +144,7 @@ fn init_reports_partial_success_without_damaging_existing_entry_and_can_retry() 
         .share_mode(3)
         .open(s.path("AGENTS.md"))
         .unwrap();
-    let out = s.err(&["init", "--agent", "codex"], "partial initialization");
+    let out = s.err(&["init", "--agent", "most"], "partial initialization");
     assert!(out.contains("APPLIED"));
     assert!(!out.contains("Disk installation complete"));
     assert_eq!(s.read("AGENTS.md"), old);

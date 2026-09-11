@@ -53,6 +53,7 @@ impl Selection {
             }
             Key::Enter => {
                 let selected = if self.multiple {
+                    self.selected[self.cursor] = true;
                     self.selected
                         .iter()
                         .enumerate()
@@ -83,10 +84,13 @@ impl TerminalPrompter {
         }
     }
 
-    pub fn select_agents(&self) -> Result<PromptOutcome<Vec<usize>>> {
+    pub fn select_integrations(&self) -> Result<PromptOutcome<Vec<usize>>> {
         self.choose(
-            "Select agents (Space toggles, Enter confirms, Esc/Ctrl-C cancels)",
-            &["Codex", "Claude Code", "Pi"],
+            "Select integrations (Space toggles; Enter picks/accepts; Esc/Ctrl-C cancels)",
+            &[
+                "Most agents (.agents / AGENTS.md)",
+                "Claude (.claude / CLAUDE.md)",
+            ],
             true,
         )
     }
@@ -200,7 +204,15 @@ mod tests {
     }
 
     #[test]
-    fn arrows_space_and_enter_preserve_multi_selection() {
+    fn enter_selects_the_highlighted_item_without_space() {
+        let mut selection = Selection::new(2, true);
+        assert!(
+            matches!(selection.key(Key::Enter), SelectionStep::Answer(indices) if indices == [0])
+        );
+    }
+
+    #[test]
+    fn enter_adds_the_highlighted_item_and_preserves_multi_selection() {
         let mut selection = Selection::new(3, true);
         assert!(matches!(
             selection.key(Key::Char(' ')),
@@ -208,10 +220,6 @@ mod tests {
         ));
         assert!(matches!(
             selection.key(Key::ArrowDown),
-            SelectionStep::Continue
-        ));
-        assert!(matches!(
-            selection.key(Key::Char(' ')),
             SelectionStep::Continue
         ));
         assert!(

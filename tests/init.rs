@@ -4,27 +4,26 @@ use doco::templates;
 use std::fs;
 
 #[test]
-fn selects_only_requested_agents_and_deduplicates() {
-    for (args, shared, claude) in [
-        (vec!["init", "--agent", "codex"], true, false),
-        (vec!["init", "--agent", "pi"], true, false),
+fn selects_only_requested_integrations_and_deduplicates() {
+    for (args, most, claude) in [
+        (vec!["init", "--agent", "most"], true, false),
         (vec!["init", "--agent", "claude"], false, true),
         (
             vec![
-                "init", "--agent", "codex", "--agent", "pi", "--agent", "codex",
+                "init", "--agent", "most", "--agent", "most", "--agent", "most",
             ],
             true,
             false,
         ),
         (
-            vec!["init", "--agent", "codex", "--agent", "claude"],
+            vec!["init", "--agent", "most", "--agent", "claude"],
             true,
             true,
         ),
     ] {
         let s = Sandbox::new();
         s.ok(&args);
-        assert_eq!(s.path("AGENTS.md").exists(), shared);
+        assert_eq!(s.path("AGENTS.md").exists(), most);
         assert_eq!(s.path("CLAUDE.md").exists(), claude);
         for directory in [
             "doco/specs",
@@ -38,7 +37,7 @@ fn selects_only_requested_agents_and_deduplicates() {
         }
         assert_eq!(s.read("doco/.gitignore"), "/tmp/\n");
         for (enabled, directory) in [
-            (shared, ".agents/skills/doco"),
+            (most, ".agents/skills/doco"),
             (claude, ".claude/skills/doco"),
         ] {
             if enabled {
@@ -67,7 +66,7 @@ fn skill_version_is_stored_only_in_the_root_skill() {
     s.init();
     assert!(
         s.read(".agents/skills/doco/SKILL.md")
-            .contains("<!-- doco:skill version=v2 -->")
+            .contains("<!-- doco:skill version=v3 -->")
     );
     for (file, _) in templates::FILES {
         if *file != "SKILL.md" {
@@ -87,7 +86,7 @@ fn old_managed_skill_is_upgraded_as_a_bundle_without_refresh() {
     let skill = ".agents/skills/doco/SKILL.md";
     s.write(
         skill,
-        &s.read(skill).replace("<!-- doco:skill version=v2 -->", ""),
+        &s.read(skill).replace("<!-- doco:skill version=v3 -->", ""),
     );
     let reference = ".agents/skills/doco/references/create.md";
     s.write(
@@ -96,7 +95,7 @@ fn old_managed_skill_is_upgraded_as_a_bundle_without_refresh() {
     );
     s.write(".agents/skills/doco/custom.txt", "keep");
 
-    let output = s.ok(&["init", "--agent", "codex"]);
+    let output = s.ok(&["init", "--agent", "most"]);
     let applied: Vec<_> = output
         .lines()
         .filter(|line| line.starts_with("APPLIED "))
@@ -117,25 +116,31 @@ fn newer_installed_skill_is_not_automatically_downgraded() {
     let s = Sandbox::new();
     s.init();
     let skill = ".agents/skills/doco/SKILL.md";
-    s.write(skill, &s.read(skill).replace("version=v2", "version=v3"));
-    s.err(&["init", "--agent", "codex"], "managed file differs");
+    s.write(skill, &s.read(skill).replace("version=v3", "version=v4"));
+    s.err(&["init", "--agent", "most"], "managed file differs");
+    assert!(s.read(skill).contains("version=v4"));
+    s.ok(&["init", "--agent", "most", "--refresh"]);
     assert!(s.read(skill).contains("version=v3"));
-    s.ok(&["init", "--agent", "codex", "--refresh"]);
-    assert!(s.read(skill).contains("version=v2"));
 }
 
 #[test]
-fn noninteractive_and_unknown_agents_do_not_write() {
+fn noninteractive_and_unknown_integrations_do_not_write() {
     let s = Sandbox::new();
+    let help = s.ok(&["init", "--help"]);
+    assert!(help.contains("possible values: most, claude"), "{help}");
+    assert!(!help.contains("possible values: codex"), "{help}");
+    assert!(!help.contains("possible values: pi"), "{help}");
     s.err(&["init"], "requires --agent");
-    s.err(&["init", "--agent", "unknown"], "invalid value");
+    for value in ["unknown", "codex", "pi"] {
+        s.err(&["init", "--agent", value], "invalid value");
+    }
     assert!(s.files().is_empty());
     assert_eq!(fs::read_dir(s.dir.path()).unwrap().count(), 0);
 }
 #[test]
 fn dry_run_has_no_writes() {
     let s = Sandbox::new();
-    let out = s.ok(&["init", "--agent", "codex", "--dry-run"]);
+    let out = s.ok(&["init", "--agent", "most", "--dry-run"]);
     assert!(out.contains("CREATE"));
     assert_eq!(fs::read_dir(s.dir.path()).unwrap().count(), 0);
 }
@@ -170,24 +175,24 @@ fn refresh_is_scoped_and_conflicts_preflight_all_files() {
     s.write("AGENTS.md", &format!("# Before\n{old}\n# After\n保留\n"));
     let before = s.files();
     s.err(
-        &["init", "--agent", "codex", "--agent", "claude"],
+        &["init", "--agent", "most", "--agent", "claude"],
         "--refresh",
     );
     assert_eq!(s.files(), before);
     assert!(!s.path(".claude").exists());
-    s.ok(&["init", "--agent", "codex", "--refresh"]);
+    s.ok(&["init", "--agent", "most", "--refresh"]);
     let updated = s.read("AGENTS.md");
     assert!(updated.starts_with("# Before\n"));
     assert!(updated.ends_with("# After\n保留\n"));
     let file = ".agents/skills/doco/references/create.md";
     s.write(file, &format!("{}\nUser edits\n", templates::MARKER));
     s.write(".agents/skills/doco/custom.txt", "keep");
-    s.err(&["init", "--agent", "codex"], "managed file differs");
-    s.ok(&["init", "--agent", "codex", "--refresh"]);
+    s.err(&["init", "--agent", "most"], "managed file differs");
+    s.ok(&["init", "--agent", "most", "--refresh"]);
     assert_eq!(s.read(".agents/skills/doco/custom.txt"), "keep");
     s.write(file, "Not managed\n");
     let before = s.files();
-    s.err(&["init", "--agent", "codex", "--refresh"], "not recognized");
+    s.err(&["init", "--agent", "most", "--refresh"], "not recognized");
     assert_eq!(s.files(), before);
 }
 #[test]
@@ -201,7 +206,7 @@ fn rejects_malformed_markers_and_custom_workflows_even_on_refresh() {
         let s = Sandbox::new();
         s.write("AGENTS.md", text);
         let before = s.files();
-        s.err(&["init", "--agent", "codex", "--refresh"], "CONFLICT");
+        s.err(&["init", "--agent", "most", "--refresh"], "CONFLICT");
         assert_eq!(s.files(), before);
         assert!(!s.path("doco").exists());
     }
@@ -229,7 +234,7 @@ fn adopts_unmarked_templates_without_duplication() {
     assert_eq!(s.files(), before);
     let s = Sandbox::new();
     s.write("AGENTS.md", &format!("{plain}\n{plain}"));
-    s.err(&["init", "--agent", "codex"], "multiple unmarked");
+    s.err(&["init", "--agent", "most"], "multiple unmarked");
 }
 #[test]
 fn fenced_examples_are_not_real_markers_or_imports() {
@@ -239,7 +244,7 @@ fn fenced_examples_are_not_real_markers_or_imports() {
         "# Examples\n\n```md\n<!-- DOCO:START -->\n@AGENTS.md\n<!-- DOCO:END -->\n```\n",
     );
     s.write("CLAUDE.md", "```md\n@AGENTS.md\n```\n");
-    s.ok(&["init", "--agent", "codex", "--agent", "claude"]);
+    s.ok(&["init", "--agent", "most", "--agent", "claude"]);
     assert_eq!(
         s.read("AGENTS.md").matches("<!-- DOCO:START -->").count(),
         2
@@ -258,34 +263,30 @@ fn rejects_unsafe_markdown_and_encoding() {
         let s = Sandbox::new();
         s.write("AGENTS.md", text);
         let before = s.files();
-        s.err(&["init", "--agent", "codex"], "CONFLICT");
+        s.err(&["init", "--agent", "most"], "CONFLICT");
         assert_eq!(s.files(), before);
     }
     let s = Sandbox::new();
     fs::write(s.path("AGENTS.md"), [0xff, 0xfe, 0x61, 0]).unwrap();
-    s.err(&["init", "--agent", "codex"], "CONFLICT");
+    s.err(&["init", "--agent", "most"], "CONFLICT");
     assert!(!s.path("doco").exists());
 }
 #[test]
-fn reuses_valid_claude_import_without_widening_rules() {
+fn claude_import_reuses_most_but_conflicts_with_a_dedicated_claude_install() {
     let s = Sandbox::new();
     s.init();
     s.write("CLAUDE.md", "# Claude\n\n@AGENTS.md\n");
     let old = s.read("CLAUDE.md");
-    s.ok(&["init", "--agent", "claude"]);
+    let output = s.ok(&["init", "--agent", "most"]);
+    assert!(output.contains("reuses the Most agents integration"));
     assert_eq!(s.read("CLAUDE.md"), old);
-    assert!(s.path(".claude/skills/doco/SKILL.md").exists());
-    s.ok(&["init", "--agent", "codex", "--agent", "claude"]);
-    s.write(
-        "CLAUDE.md",
-        &format!(
-            "{old}\n<!-- DOCO:START -->\n{}<!-- DOCO:END -->\n",
-            templates::navigation(".claude/skills/doco")
-        ),
-    );
     let before = s.files();
-    s.err(&["init", "--agent", "claude", "--refresh"], "both contain");
+    s.err(
+        &["init", "--agent", "claude"],
+        "remove the import before installing a dedicated Claude integration",
+    );
     assert_eq!(s.files(), before);
+    assert!(!s.path(".claude").exists());
 }
 #[test]
 fn rejects_missing_complex_and_recursive_imports() {
@@ -312,50 +313,21 @@ fn rejects_missing_complex_and_recursive_imports() {
 fn override_warns_and_is_not_modified() {
     let s = Sandbox::new();
     s.write("AGENTS.override.md", "Existing override");
-    let out = s.ok(&["init", "--agent", "pi"]);
+    let out = s.ok(&["init", "--agent", "most"]);
     assert!(out.contains("may not take effect"));
     assert!(out.contains("NOT verified"));
     assert_eq!(s.read("AGENTS.override.md"), "Existing override");
 }
 #[test]
-fn alternate_pi_skill_is_reused_only_when_compatible() {
-    let s = Sandbox::new();
-    for (file, content) in templates::FILES {
-        s.write(&format!(".pi/skills/doco/{file}"), content);
+fn legacy_agent_specific_skill_paths_require_manual_migration() {
+    for path in [".pi/skills/doco/SKILL.md", ".codex/skills/doco/SKILL.md"] {
+        for integration in ["most", "claude"] {
+            let s = Sandbox::new();
+            s.write(path, "legacy");
+            let before = s.files();
+            s.err(&["init", "--agent", integration, "--refresh"], "migrate");
+            assert_eq!(s.files(), before);
+            assert!(!s.path("doco").exists());
+        }
     }
-    s.ok(&["init", "--agent", "pi"]);
-    assert!(!s.path(".agents").exists());
-    assert!(s.read("AGENTS.md").contains(".pi/skills/doco/SKILL.md"));
-    s.err(&["init", "--agent", "pi", "--agent", "codex"], "migrate");
-
-    let s = Sandbox::new();
-    for (file, content) in templates::FILES {
-        s.write(&format!(".pi/skills/doco/{file}"), content);
-    }
-    let skill = ".pi/skills/doco/SKILL.md";
-    s.write(
-        skill,
-        &s.read(skill).replace("<!-- doco:skill version=v2 -->", ""),
-    );
-    let reference = ".pi/skills/doco/references/create.md";
-    s.write(
-        reference,
-        &format!("{}\nOld managed edit\n", s.read(reference)),
-    );
-    s.ok(&["init", "--agent", "pi"]);
-    assert_eq!(s.read(skill), templates::FILES[0].1);
-    assert_eq!(
-        s.read(reference),
-        templates::FILES
-            .iter()
-            .find(|(file, _)| *file == "references/create.md")
-            .unwrap()
-            .1
-    );
-    assert!(!s.path(".agents").exists());
-
-    let s = Sandbox::new();
-    s.write(".pi/skills/doco/SKILL.md", "unrelated");
-    s.err(&["init", "--agent", "pi", "--refresh"], "migrate");
-    assert!(!s.path("doco").exists());
 }

@@ -70,7 +70,7 @@ impl Sandbox {
         output
     }
     pub fn init(&self) {
-        self.ok(&["init", "--agent", "codex"]);
+        self.ok(&["init", "--agent", "most"]);
     }
     pub fn ready(&self, id: &str) {
         self.ok(&["new", id]);

@@ -15,8 +15,12 @@ cargo install --path . --locked
 Run `doco` from the target project root:
 
 ```sh
-# Initialize integrations for one or more agents.
-doco init --agent codex --agent pi
+# Initialize one or both integration targets.
+doco init --agent most --agent claude
+
+# Refresh installed skill bundles and managed instruction entries after upgrading doco.
+doco update --dry-run
+doco update
 
 # Create and inspect a full change package.
 doco new bounded-event-queue
@@ -35,6 +39,8 @@ doco archive bounded-event-queue
 `doco new` creates only a package skeleton. The default full package requires a proposal, implementation plan, and task list. `--proposal-only` creates just a marked `proposal.md` for a tracked change whose behavior and acceptance need no separate design or dependent task breakdown.
 
 A doco change is optional for implementation and is not an implementation-history log: archive retains only the proposal. Routine behavior fixes and implementation-detail edits may proceed without one unless tracking is explicitly requested. Use Git, pull requests, or release notes for implementation history, and still update current architecture/specs whenever their documented facts or contracts change.
+
+`--agent most` installs `.agents/skills/doco` with an `AGENTS.md` entry; `--agent claude` installs `.claude/skills/doco` with a `CLAUDE.md` entry. `doco update` refreshes only complete integrations already installed at those locations.
 
 Use `--root <path>` to target another project. Use `doco --help` or `doco <command> --help` for the complete command reference. In automation, pass explicit arguments and `--no-interactive`.
 

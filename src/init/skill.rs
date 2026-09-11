@@ -1,5 +1,5 @@
 use super::plan::Plan;
-use crate::{Project, markdown, safety, templates};
+use crate::{Project, markdown, templates};
 use anyhow::{Context, Result, bail};
 
 fn is_managed(text: &str) -> bool {
@@ -148,32 +148,6 @@ pub fn install(plan: &mut Plan, project: &Project, directory: &str, refresh: boo
         directory,
         files,
     );
-}
-
-pub fn compatible(project: &Project, directory: &str) -> Result<bool> {
-    safety::inspect(project.root(), &project.path(directory))?;
-    if !project.path(directory).exists() {
-        return Ok(false);
-    }
-    let skill_path = project.path(format!("{directory}/SKILL.md"));
-    let Some(skill_snapshot) = safety::snapshot(project.root(), &skill_path)? else {
-        return Ok(false);
-    };
-    let old_skill = safety::decode(&skill_snapshot.bytes)?;
-    if !is_managed(&old_skill) && !is_unmarked_template(&old_skill, bundled_skill()) {
-        return Ok(false);
-    }
-    let replace_managed = bundled_version()? > parsed_skill_version(&old_skill).unwrap_or(0);
-    for (file, generated) in templates::FILES {
-        let path = project.path(format!("{directory}/{file}"));
-        let old = safety::snapshot(project.root(), &path)?
-            .map(|snapshot| safety::decode(&snapshot.bytes))
-            .transpose()?;
-        if update(old.as_deref(), generated, replace_managed).is_err() {
-            return Ok(false);
-        }
-    }
-    Ok(true)
 }
 
 #[cfg(test)]

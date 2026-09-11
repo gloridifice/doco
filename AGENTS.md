@@ -1,6 +1,7 @@
 # Project instructions
 
 <!-- DOCO:START -->
+<!-- doco:entry template=v1 -->
 ## Doco
 
 For current project documentation and explicitly tracked changes, use the
