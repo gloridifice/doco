@@ -18,10 +18,13 @@ Run `doco` from the target project root:
 # Initialize integrations for one or more agents.
 doco init --agent codex --agent pi
 
-# Create and inspect a change package.
+# Create and inspect a full change package.
 doco new bounded-event-queue
 doco context bounded-event-queue
 doco check bounded-event-queue
+
+# Or track a bounded change with proposal.md only.
+doco new fix-empty-output --proposal-only
 
 # Complete the accepted work, then preview and archive it.
 doco complete bounded-event-queue
@@ -29,7 +32,9 @@ doco archive bounded-event-queue --dry-run
 doco archive bounded-event-queue
 ```
 
-`doco new` creates only the package skeleton. A developer or agent must fill in the proposal, implementation plan, and task list before doing the work.
+`doco new` creates only a package skeleton. The default full package requires a proposal, implementation plan, and task list. `--proposal-only` creates just a marked `proposal.md` for a tracked change whose behavior and acceptance need no separate design or dependent task breakdown.
+
+A doco change is optional for implementation and is not an implementation-history log: archive retains only the proposal. Routine behavior fixes and implementation-detail edits may proceed without one unless tracking is explicitly requested. Use Git, pull requests, or release notes for implementation history, and still update current architecture/specs whenever their documented facts or contracts change.
 
 Use `--root <path>` to target another project. Use `doco --help` or `doco <command> --help` for the complete command reference. In automation, pass explicit arguments and `--no-interactive`.
 

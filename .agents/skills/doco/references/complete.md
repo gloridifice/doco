@@ -6,6 +6,11 @@ source/contracts. Verify all in-scope tasks really completed, agreed acceptance
 has actual evidence, no unresolved blockers remain, and affected architecture,
 specs and durable decisions have been synchronized with delivered facts.
 
+For proposal-only changes, review each proposal acceptance criterion directly.
+Before completion, Result must describe the delivered outcome and proposal.md must
+contain concise actual verification evidence. No task checkbox is implied or
+required.
+
 If an environment cannot run required acceptance, report the limitation. Do not
 count missing evidence as success unless the user explicitly accepts the stated
 limitation or approves revised acceptance. Record that decision and the actual

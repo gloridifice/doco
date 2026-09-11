@@ -78,6 +78,13 @@ impl Sandbox {
         self.write(&format!("doco/changes/active/{id}/work/implement.md"), "# Design\n\n## 1. Baseline and goals\nThe fixture represents an empty project; add a standalone queue.\n\n## 2. Overall approach\nThe caller owns a VecDeque and never blocks.\n\n## 3. APIs and data model\npush(Event) returns Result<(), Full>; pop() returns Option<Event>. State belongs to the caller.\n\n## 4. Algorithms and rules\nReject a push at length two; pop from the front. No threads or persistence.\n\n## 5. Fixed decisions and discretion\nCapacity, order and overflow are fixed. Local names are discretionary.\nBlocked: none\n\n## 6. Verification and documentation impact\nTest zero, one, two and three pushes, then FIFO pops. Current architecture impact: none in this fixture.\n");
         self.write(&format!("doco/changes/active/{id}/work/tasks.md"), "# Tasks\n\n- [x] 1.1 Implement bounded queue\n  - Acceptance: FIFO and capacity two are enforced.\n  - Verification: fixture queue boundary checks passed.\n\n- [x] 2.1 Run regression checks\n  - Dependencies: 1.1\n  - Acceptance: expected overflow and FIFO behavior verified.\n  - Verification: fixture regression passed.\n");
     }
+    pub fn proposal_only_ready(&self, id: &str) {
+        self.ok(&["new", id, "--proposal-only"]);
+        self.write(
+            &format!("doco/changes/active/{id}/proposal.md"),
+            "<!-- doco:change mode=proposal-only -->\n# Focused fix\n\n## Purpose\nCorrect one bounded behavior.\n\n## Scope and acceptance\nReturn the documented value for the focused case; no architecture change.\n\n## Result\nDelivered the focused fix.\n\nVerification: focused fixture and regression checks passed.\n",
+        );
+    }
     pub fn files(&self) -> BTreeMap<PathBuf, Vec<u8>> {
         fn walk(root: &Path, at: &Path, out: &mut BTreeMap<PathBuf, Vec<u8>>) {
             for entry in fs::read_dir(at).unwrap() {

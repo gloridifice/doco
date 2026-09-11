@@ -53,8 +53,13 @@ enum Command {
         #[arg(long)]
         refresh: bool,
     },
-    /// Create skeletons; an agent must supply the actual design
-    New { id: String },
+    /// Create a tracked change skeleton; implementation history belongs in Git/PRs
+    New {
+        id: String,
+        /// Create only proposal.md for a bounded change with no separate design/tasks
+        #[arg(long)]
+        proposal_only: bool,
+    },
     /// List active changes, optionally including historical states
     List {
         /// Include completed changes
@@ -213,7 +218,16 @@ fn execute(
                 .collect();
             init::run_with_ui(&project, &ids, dry_run, refresh, &mut reporter)
         }
-        Command::New { id } => lifecycle::new_change_with_ui(&project, &id, &mut reporter),
+        Command::New { id, proposal_only } => lifecycle::new_change_in_mode_with_ui(
+            &project,
+            &id,
+            if proposal_only {
+                doco::PackageMode::ProposalOnly
+            } else {
+                doco::PackageMode::Full
+            },
+            &mut reporter,
+        ),
         Command::List {
             completed,
             archived,

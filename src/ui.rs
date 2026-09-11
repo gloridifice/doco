@@ -53,6 +53,7 @@ impl fmt::Display for ModifiedAge {
 pub enum TaskCount {
     Known { done: usize, total: usize },
     Missing,
+    NotApplicable,
     Archived,
 }
 
@@ -61,7 +62,7 @@ impl fmt::Display for TaskCount {
         match self {
             Self::Known { done, total } => write!(f, "{done}/{total}"),
             Self::Missing => f.write_str("?"),
-            Self::Archived => f.write_str("-"),
+            Self::NotApplicable | Self::Archived => f.write_str("-"),
         }
     }
 }

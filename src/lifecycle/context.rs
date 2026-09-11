@@ -1,5 +1,5 @@
 use crate::{
-    Project, State, markdown, safety,
+    PackageMode, Project, State, markdown, package_mode, safety,
     ui::{self, Reporter, Tone},
 };
 use anyhow::{Result, bail};
@@ -36,6 +36,8 @@ pub fn context_with_ui(
             change.state
         );
     }
+    let proposal_path = change.path.join("proposal.md");
+    let proposal_mode = package_mode(&safety::text(project.root(), &proposal_path)?)?;
     ui::line(
         reporter,
         Tone::Info,
@@ -53,8 +55,8 @@ pub fn context_with_ui(
     let mut paths = BTreeSet::new();
     let mut queue = VecDeque::new();
     queue.push_back(project.path("doco/architecture.md"));
-    queue.push_back(change.path.join("proposal.md"));
-    if change.state != State::Archived {
+    queue.push_back(proposal_path);
+    if change.state != State::Archived && proposal_mode == PackageMode::Full {
         queue.push_back(change.path.join("work/implement.md"));
         queue.push_back(change.path.join("work/tasks.md"));
     }

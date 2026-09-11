@@ -174,6 +174,29 @@ pub fn atomic_write(
     Ok(())
 }
 
+/// Remove only the exact file written by the caller.
+pub fn remove_file(root: &Path, path: &Path, expected: &Snapshot) -> Result<()> {
+    verify(root, path, &Some(expected.clone()))?;
+    fs::remove_file(path).with_context(|| format!("remove file {}", path.display()))
+}
+
+/// Remove a directory created by the caller without traversing unknown content.
+pub fn remove_empty_directory(root: &Path, path: &Path) -> Result<()> {
+    inspect(root, path)?;
+    let metadata = match fs::metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
+    if !metadata.is_dir() {
+        bail!("expected directory: {}", path.display());
+    }
+    if fs::read_dir(path)?.next().transpose()?.is_some() {
+        bail!("directory is not empty: {}", path.display());
+    }
+    fs::remove_dir(path).with_context(|| format!("remove directory {}", path.display()))
+}
+
 pub struct Lock {
     _file: File,
 }

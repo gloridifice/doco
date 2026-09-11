@@ -3,6 +3,7 @@ name: doco
 description: Manage project documentation and doco changes. Use when migrating existing project documentation into doco; creating, executing, reviewing, completing, or archiving a doco change; or maintaining the project's current technical documents.
 ---
 <!-- doco:managed template=v1 -->
+<!-- doco:skill version=v2 -->
 
 # Doco
 
@@ -10,6 +11,11 @@ Start from the project's `doco/architecture.md` and read only relevant current
 specs, effective decisions, source code, and the selected change.
 For documentation-only work, follow these current-document rules without
 creating a change unless the user requests change tracking.
+
+Change packages preserve goals, decisions and delivery summaries; they are not
+implementation logs, because archive retains only proposal.md. Do not create a
+change merely to record a routine behavior fix or implementation-detail edit.
+Use Git or the project's normal delivery records for implementation history.
 
 Read the reference for the requested action:
 - Migrate existing documentation: `references/migrate.md`

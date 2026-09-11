@@ -40,6 +40,22 @@ pub fn is_none(value: &str) -> bool {
             | "resolved"
     )
 }
+pub fn verification(text: &str) -> bool {
+    let mut found = false;
+    for (_, line) in markdown::content_lines(text) {
+        if let Some((key, value)) = field(line)
+            && matches!(key.as_str(), "verification" | "验证" | "验证记录")
+        {
+            found |= !value.is_empty();
+        }
+    }
+    found
+        || markdown::sections(text).iter().any(|s| {
+            markdown::title_matches(&s.title, &["Verification", "验证", "验证记录", "执行证据"])
+                && !s.content.is_empty()
+        })
+}
+
 pub fn parse(text: &str) -> Tasks {
     let mut out = Tasks::default();
     let task_pattern =
@@ -92,10 +108,7 @@ pub fn parse(text: &str) -> Tasks {
             }
         }
     }
-    out.verification |= markdown::sections(text).iter().any(|s| {
-        markdown::title_matches(&s.title, &["Verification", "验证", "验证记录", "执行证据"])
-            && !s.content.is_empty()
-    });
+    out.verification |= verification(text);
     if out.items.is_empty() {
         out.errors.push("no executable tasks found".into());
     }

@@ -2,7 +2,7 @@ mod archive;
 mod context;
 mod list;
 use crate::{
-    Project, State, check as validation, safety, templates,
+    PackageMode, Project, State, check as validation, package_mode, safety, templates,
     ui::{self, Reporter},
     validate_id,
 };
@@ -18,6 +18,15 @@ pub fn new_change(project: &Project, id: &str) -> Result<()> {
 }
 
 pub fn new_change_with_ui(project: &Project, id: &str, reporter: &mut dyn Reporter) -> Result<()> {
+    new_change_in_mode_with_ui(project, id, PackageMode::Full, reporter)
+}
+
+pub fn new_change_in_mode_with_ui(
+    project: &Project,
+    id: &str,
+    mode: PackageMode,
+    reporter: &mut dyn Reporter,
+) -> Result<()> {
     validate_id(id)?;
     project.initialized()?;
     let _lock = safety::Lock::acquire(project.root())?;
@@ -29,25 +38,36 @@ pub fn new_change_with_ui(project: &Project, id: &str, reporter: &mut dyn Report
     let temporary = tempfile::Builder::new()
         .prefix(".new-")
         .tempdir_in(project.path("doco/tmp"))?;
-    fs::create_dir(temporary.path().join("work"))?;
-    for name in ["proposal.md", "implement.md", "tasks.md"] {
-        let path = if name == "proposal.md" {
-            temporary.path().join(name)
-        } else {
-            temporary.path().join("work").join(name)
-        };
-        safety::atomic_write(
-            project.root(),
-            &path,
-            &None,
-            templates::change_file(name, id).as_bytes(),
-        )?;
+    let proposal = match mode {
+        PackageMode::Full => templates::change_file("proposal.md", id),
+        PackageMode::ProposalOnly => templates::proposal_only_file(id),
+    };
+    safety::atomic_write(
+        project.root(),
+        &temporary.path().join("proposal.md"),
+        &None,
+        proposal.as_bytes(),
+    )?;
+    if mode == PackageMode::Full {
+        fs::create_dir(temporary.path().join("work"))?;
+        for name in ["implement.md", "tasks.md"] {
+            safety::atomic_write(
+                project.root(),
+                &temporary.path().join("work").join(name),
+                &None,
+                templates::change_file(name, id).as_bytes(),
+            )?;
+        }
     }
     safety::move_directory(project.root(), temporary.path(), &destination)?;
+    let files = match mode {
+        PackageMode::Full => "proposal.md, work/implement.md, work/tasks.md",
+        PackageMode::ProposalOnly => "proposal.md (proposal-only)",
+    };
     ui::text(
         reporter,
         &format!(
-            "Created active/{id}: proposal.md, work/implement.md, work/tasks.md.\nSkeleton only: fill the design and acceptance criteria before execution; check is expected to fail until placeholders are replaced.\n"
+            "Created active/{id}: {files}.\nSkeleton only: fill the scope and acceptance criteria before execution; check is expected to fail until placeholders are replaced.\n"
         ),
     )?;
     Ok(())
@@ -87,6 +107,10 @@ pub fn complete_with_ui(project: &Project, id: &str, reporter: &mut dyn Reporter
         bail!("complete requires active; {id} is {}", change.state);
     }
     let before = safety::tree(project.root(), &change.path)?;
+    let mode = package_mode(&safety::text(
+        project.root(),
+        &change.path.join("proposal.md"),
+    )?)?;
     let report = validation::inspect(project, &change, true)?;
     report.show_with_ui(reporter)?;
     report.ensure()?;
@@ -101,7 +125,11 @@ pub fn complete_with_ui(project: &Project, id: &str, reporter: &mut dyn Reporter
     ui::text(
         reporter,
         &format!(
-            "Moved {id} to completed with full work package. Mechanical checks only; semantic acceptance and current-document synchronization remain the reviewer's responsibility. No Git or release action taken.\n"
+            "Moved {id} to completed with {}. Mechanical checks only; semantic acceptance and current-document synchronization remain the reviewer's responsibility. No Git or release action taken.\n",
+            match mode {
+                PackageMode::Full => "full work package",
+                PackageMode::ProposalOnly => "proposal-only package",
+            }
         ),
     )?;
     Ok(())
@@ -122,8 +150,20 @@ pub fn reopen_with_ui(project: &Project, id: &str, reporter: &mut dyn Reporter) 
             "reopen requires completed; archived changes need a new ID referencing the old proposal"
         );
     }
-    for name in ["proposal.md", "work/implement.md", "work/tasks.md"] {
-        safety::text(project.root(), &change.path.join(name))?;
+    let proposal = safety::text(project.root(), &change.path.join("proposal.md"))?;
+    match package_mode(&proposal)? {
+        PackageMode::Full => {
+            for name in ["work/implement.md", "work/tasks.md"] {
+                safety::text(project.root(), &change.path.join(name))?;
+            }
+        }
+        PackageMode::ProposalOnly => {
+            let work = change.path.join("work");
+            safety::inspect(project.root(), &work)?;
+            if work.try_exists()? {
+                bail!("proposal-only change must not contain work/");
+            }
+        }
     }
     safety::move_directory(
         project.root(),

@@ -1,6 +1,51 @@
 use super::plan::Plan;
 use crate::{Project, markdown, safety, templates};
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
+
+fn is_managed(text: &str) -> bool {
+    markdown::body_lines(text).iter().any(|(_, line)| {
+        regex::Regex::new(r"^<!-- doco:managed template=v[0-9]+ -->$")
+            .unwrap()
+            .is_match(line.trim())
+    })
+}
+
+fn is_unmarked_template(old: &str, generated: &str) -> bool {
+    let normalized = markdown::normalize(generated);
+    let unmarked = normalized.replace(&format!("{}\n", templates::MARKER), "");
+    markdown::normalize(old) == unmarked
+}
+
+fn parsed_skill_version(text: &str) -> Option<u64> {
+    let candidates: Vec<_> = markdown::body_lines(text)
+        .into_iter()
+        .map(|(_, line)| line.trim())
+        .filter(|line| line.starts_with("<!-- doco:skill"))
+        .collect();
+    let [candidate] = candidates.as_slice() else {
+        return None;
+    };
+    let captures = regex::Regex::new(r"^<!-- doco:skill version=v(0|[1-9][0-9]*) -->$")
+        .unwrap()
+        .captures(candidate)?;
+    captures.get(1)?.as_str().parse().ok()
+}
+
+fn bundled_skill() -> &'static str {
+    templates::FILES
+        .iter()
+        .find_map(|(path, content)| (*path == "SKILL.md").then_some(*content))
+        .expect("built-in SKILL.md exists")
+}
+
+fn bundled_version() -> Result<u64> {
+    let version = parsed_skill_version(bundled_skill())
+        .context("built-in SKILL.md has no unique valid skill version")?;
+    if version == 0 {
+        bail!("built-in SKILL.md skill version must be greater than v0");
+    }
+    Ok(version)
+}
 
 pub fn update(old: Option<&str>, generated: &str, refresh: bool) -> Result<String> {
     if let Some(text) = old.and_then(|s| s.strip_prefix('\u{feff}')) {
@@ -16,16 +61,10 @@ pub fn update(old: Option<&str>, generated: &str, refresh: bool) -> Result<Strin
     if markdown::normalize(old) == normalized {
         return Ok(old.to_string());
     }
-    let unmarked = normalized.replace(&format!("{}\n", templates::MARKER), "");
-    if markdown::normalize(old) == unmarked {
+    if is_unmarked_template(old, generated) {
         return Ok(markdown::styled(&normalized, old));
     }
-    let managed = markdown::body_lines(old).iter().any(|(_, line)| {
-        regex::Regex::new(r"^<!-- doco:managed template=v[0-9]+ -->$")
-            .unwrap()
-            .is_match(line.trim())
-    });
-    if !managed {
+    if !is_managed(old) {
         bail!("same-name file is not recognized as doco-managed; --refresh cannot overwrite it");
     }
     if !refresh {
@@ -40,9 +79,15 @@ pub fn update(old: Option<&str>, generated: &str, refresh: bool) -> Result<Strin
 }
 
 pub fn install(plan: &mut Plan, project: &Project, directory: &str, refresh: bool) {
-    plan.directory(project, directory);
-    let skill = project.path(format!("{directory}/SKILL.md"));
-    if !skill.exists() && project.path(directory).is_dir() {
+    let skill_relative = format!("{directory}/SKILL.md");
+    let existing_skill = match plan.effective_text(project, &skill_relative) {
+        Ok(text) => text,
+        Err(error) => {
+            plan.conflicts.push(format!("{skill_relative}: {error:#}"));
+            return;
+        }
+    };
+    if existing_skill.is_none() && project.path(directory).is_dir() {
         match std::fs::read_dir(project.path(directory)).map(|mut entries| entries.next().is_some())
         {
             Ok(true) => {
@@ -58,11 +103,51 @@ pub fn install(plan: &mut Plan, project: &Project, directory: &str, refresh: boo
             _ => {}
         }
     }
-    for (file, content) in templates::FILES {
-        plan.file(project, &format!("{directory}/{file}"), |old| {
-            update(old, content, refresh)
-        });
+
+    let current_version = match bundled_version() {
+        Ok(version) => version,
+        Err(error) => {
+            plan.conflicts.push(format!("built-in skill: {error:#}"));
+            return;
+        }
+    };
+    let upgrade = match existing_skill.as_deref() {
+        None => true,
+        Some(old) => {
+            if !is_managed(old) && !is_unmarked_template(old, bundled_skill()) {
+                plan.conflicts.push(format!(
+                    "{skill_relative}: same-name file is not recognized as doco-managed; --refresh cannot overwrite it"
+                ));
+                return;
+            }
+            current_version > parsed_skill_version(old).unwrap_or(0)
+        }
+    };
+    let replace_managed = refresh || upgrade;
+
+    let mut files = Vec::new();
+    for (file, content) in templates::FILES
+        .iter()
+        .filter(|(file, _)| *file != "SKILL.md")
+        .chain(
+            templates::FILES
+                .iter()
+                .filter(|(file, _)| *file == "SKILL.md"),
+        )
+    {
+        let relative = format!("{directory}/{file}");
+        if let Some(op) = plan.prepare_file(project, &relative, |old| {
+            update(old, content, replace_managed)
+        }) {
+            files.push(op);
+        }
     }
+    plan.file_group(
+        project,
+        &format!("skill bundle {directory}"),
+        directory,
+        files,
+    );
 }
 
 pub fn compatible(project: &Project, directory: &str) -> Result<bool> {
@@ -70,13 +155,21 @@ pub fn compatible(project: &Project, directory: &str) -> Result<bool> {
     if !project.path(directory).exists() {
         return Ok(false);
     }
+    let skill_path = project.path(format!("{directory}/SKILL.md"));
+    let Some(skill_snapshot) = safety::snapshot(project.root(), &skill_path)? else {
+        return Ok(false);
+    };
+    let old_skill = safety::decode(&skill_snapshot.bytes)?;
+    if !is_managed(&old_skill) && !is_unmarked_template(&old_skill, bundled_skill()) {
+        return Ok(false);
+    }
+    let replace_managed = bundled_version()? > parsed_skill_version(&old_skill).unwrap_or(0);
     for (file, generated) in templates::FILES {
         let path = project.path(format!("{directory}/{file}"));
-        let Some(snapshot) = safety::snapshot(project.root(), &path)? else {
-            return Ok(false);
-        };
-        let old = safety::decode(&snapshot.bytes)?;
-        if markdown::normalize(&old) != markdown::normalize(generated) {
+        let old = safety::snapshot(project.root(), &path)?
+            .map(|snapshot| safety::decode(&snapshot.bytes))
+            .transpose()?;
+        if update(old.as_deref(), generated, replace_managed).is_err() {
             return Ok(false);
         }
     }
@@ -85,7 +178,7 @@ pub fn compatible(project: &Project, directory: &str) -> Result<bool> {
 
 #[cfg(test)]
 mod tests {
-    use super::update;
+    use super::{parsed_skill_version, update};
     use crate::templates::MARKER;
 
     #[test]
@@ -102,5 +195,28 @@ mod tests {
             update(Some(unmarked), &generated, false).unwrap(),
             installed
         );
+    }
+
+    #[test]
+    fn parses_one_canonical_skill_version_and_defaults_other_forms_to_v0() {
+        for (text, expected) in [
+            ("<!-- doco:skill version=v0 -->", Some(0)),
+            ("<!-- doco:skill version=v1 -->", Some(1)),
+            ("<!-- doco:skill version=v10 -->", Some(10)),
+            ("no version", None),
+            ("<!-- doco:skill version=v01 -->", None),
+            ("<!-- doco:skill version=1 -->", None),
+            (
+                "<!-- doco:skill version=v1 -->\n<!-- doco:skill version=v2 -->",
+                None,
+            ),
+            (
+                "```md\n<!-- doco:skill version=v9 -->\n```\n<!-- doco:skill version=v2 -->",
+                Some(2),
+            ),
+            ("<!-- doco:skill version=v18446744073709551616 -->", None),
+        ] {
+            assert_eq!(parsed_skill_version(text), expected, "{text}");
+        }
     }
 }

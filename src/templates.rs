@@ -43,9 +43,17 @@ pub fn change_file(name: &str, id: &str) -> String {
         .replace(&format!("{MARKER}\n"), "")
         .replace("{{id}}", id)
 }
+
+pub fn proposal_only_file(id: &str) -> String {
+    format!(
+        "{}\n{}",
+        crate::PROPOSAL_ONLY_MARKER,
+        change_file("proposal.md", id)
+    )
+}
 pub fn navigation(skill: &str) -> String {
     format!(
-        "## Doco\n\nFor project documentation and managed changes, use the `doco` skill.\nRead `{skill}/SKILL.md` before creating, executing, completing,\nor archiving a change. Perform only the requested phase.\nStart from `doco/architecture.md` and relevant current specs and decisions.\nFor implementation, use the selected active change's proposal, design,\nand tasks. Treat completed changes, archived changes, and `doco/tmp/`\nas non-current material; consult them only when explicitly needed.\n"
+        "## Doco\n\nFor current project documentation and explicitly tracked changes, use the\n`doco` skill. Read `{skill}/SKILL.md` before creating, executing, completing,\nor archiving a change. Perform only the requested phase.\nA doco change package is optional for implementation and is not an\nimplementation-history mechanism: archiving retains only proposal.md. Routine\nbehavior fixes and implementation-detail changes may proceed without creating\na doco change unless the user explicitly requests tracking. Use Git, pull\nrequests, or release notes for implementation history. Regardless of tracking,\nupdate current architecture and specs when their documented facts or contracts\nchange.\nStart from `doco/architecture.md` and relevant current specs and decisions.\nWhen implementing a selected tracked change, use its proposal and any present\ndesign and task files. Treat completed changes, archived changes, and\n`doco/tmp/` as non-current material; consult them only when explicitly needed.\n"
     )
 }
 pub const ARCHITECTURE: &str = "# Current architecture\n\nNo architecture has been documented yet. Inspect the current source and record\nonly implemented module boundaries, key data flows and important constraints.\nDo not describe future change proposals as current facts.\n";

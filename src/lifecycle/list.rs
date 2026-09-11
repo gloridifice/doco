@@ -1,7 +1,7 @@
 use crate::{
-    Project, State,
+    PackageMode, Project, State,
     check::tasks,
-    safety,
+    package_mode, safety,
     ui::{ChangeRow, ModifiedAge, TaskCount},
 };
 use anyhow::{Context, Result};
@@ -43,18 +43,28 @@ fn list_changes_at(
             let count = if change.state == State::Archived {
                 TaskCount::Archived
             } else {
-                let path = change.path.join("work/tasks.md");
-                match safety::snapshot(project.root(), &path)
-                    .with_context(|| format!("cannot read tasks: {}", path.display()))?
-                {
-                    None => TaskCount::Missing,
-                    Some(snapshot) => {
-                        let text = safety::decode(&snapshot.bytes)
-                            .with_context(|| format!("invalid UTF-8: {}", path.display()))?;
-                        let parsed = tasks::parse(&text);
-                        TaskCount::Known {
-                            done: parsed.items.iter().filter(|task| task.done).count(),
-                            total: parsed.items.len(),
+                let proposal_path = change.path.join("proposal.md");
+                let proposal = safety::text(project.root(), &proposal_path).with_context(|| {
+                    format!("cannot read proposal: {}", proposal_path.display())
+                })?;
+                match package_mode(&proposal)? {
+                    PackageMode::ProposalOnly => TaskCount::NotApplicable,
+                    PackageMode::Full => {
+                        let path = change.path.join("work/tasks.md");
+                        match safety::snapshot(project.root(), &path)
+                            .with_context(|| format!("cannot read tasks: {}", path.display()))?
+                        {
+                            None => TaskCount::Missing,
+                            Some(snapshot) => {
+                                let text = safety::decode(&snapshot.bytes).with_context(|| {
+                                    format!("invalid UTF-8: {}", path.display())
+                                })?;
+                                let parsed = tasks::parse(&text);
+                                TaskCount::Known {
+                                    done: parsed.items.iter().filter(|task| task.done).count(),
+                                    total: parsed.items.len(),
+                                }
+                            }
                         }
                     }
                 }

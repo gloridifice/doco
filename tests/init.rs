@@ -62,6 +62,69 @@ fn selects_only_requested_agents_and_deduplicates() {
     }
 }
 #[test]
+fn skill_version_is_stored_only_in_the_root_skill() {
+    let s = Sandbox::new();
+    s.init();
+    assert!(
+        s.read(".agents/skills/doco/SKILL.md")
+            .contains("<!-- doco:skill version=v2 -->")
+    );
+    for (file, _) in templates::FILES {
+        if *file != "SKILL.md" {
+            assert!(
+                !s.read(&format!(".agents/skills/doco/{file}"))
+                    .contains("doco:skill version="),
+                "unexpected skill version in {file}"
+            );
+        }
+    }
+}
+
+#[test]
+fn old_managed_skill_is_upgraded_as_a_bundle_without_refresh() {
+    let s = Sandbox::new();
+    s.init();
+    let skill = ".agents/skills/doco/SKILL.md";
+    s.write(
+        skill,
+        &s.read(skill).replace("<!-- doco:skill version=v2 -->", ""),
+    );
+    let reference = ".agents/skills/doco/references/create.md";
+    s.write(
+        reference,
+        &format!("{}\nOld managed edit\n", s.read(reference)),
+    );
+    s.write(".agents/skills/doco/custom.txt", "keep");
+
+    let output = s.ok(&["init", "--agent", "codex"]);
+    let applied: Vec<_> = output
+        .lines()
+        .filter(|line| line.starts_with("APPLIED "))
+        .collect();
+    assert!(applied[0].ends_with("create.md"), "{output}");
+    assert!(applied[1].ends_with("SKILL.md"), "{output}");
+    for (file, content) in templates::FILES {
+        assert_eq!(s.read(&format!(".agents/skills/doco/{file}")), *content);
+    }
+    assert_eq!(s.read(".agents/skills/doco/custom.txt"), "keep");
+    let before = s.files();
+    s.init();
+    assert_eq!(s.files(), before);
+}
+
+#[test]
+fn newer_installed_skill_is_not_automatically_downgraded() {
+    let s = Sandbox::new();
+    s.init();
+    let skill = ".agents/skills/doco/SKILL.md";
+    s.write(skill, &s.read(skill).replace("version=v2", "version=v3"));
+    s.err(&["init", "--agent", "codex"], "managed file differs");
+    assert!(s.read(skill).contains("version=v3"));
+    s.ok(&["init", "--agent", "codex", "--refresh"]);
+    assert!(s.read(skill).contains("version=v2"));
+}
+
+#[test]
 fn noninteractive_and_unknown_agents_do_not_write() {
     let s = Sandbox::new();
     s.err(&["init"], "requires --agent");
@@ -156,7 +219,10 @@ fn adopts_unmarked_templates_without_duplication() {
     }
     s.init();
     let result = s.read("AGENTS.md");
-    assert_eq!(result.matches("For project documentation").count(), 1);
+    assert_eq!(
+        result.matches("For current project documentation").count(),
+        1
+    );
     assert_eq!(result.matches("<!-- DOCO:START -->").count(), 1);
     let before = s.files();
     s.init();
@@ -261,6 +327,33 @@ fn alternate_pi_skill_is_reused_only_when_compatible() {
     assert!(!s.path(".agents").exists());
     assert!(s.read("AGENTS.md").contains(".pi/skills/doco/SKILL.md"));
     s.err(&["init", "--agent", "pi", "--agent", "codex"], "migrate");
+
+    let s = Sandbox::new();
+    for (file, content) in templates::FILES {
+        s.write(&format!(".pi/skills/doco/{file}"), content);
+    }
+    let skill = ".pi/skills/doco/SKILL.md";
+    s.write(
+        skill,
+        &s.read(skill).replace("<!-- doco:skill version=v2 -->", ""),
+    );
+    let reference = ".pi/skills/doco/references/create.md";
+    s.write(
+        reference,
+        &format!("{}\nOld managed edit\n", s.read(reference)),
+    );
+    s.ok(&["init", "--agent", "pi"]);
+    assert_eq!(s.read(skill), templates::FILES[0].1);
+    assert_eq!(
+        s.read(reference),
+        templates::FILES
+            .iter()
+            .find(|(file, _)| *file == "references/create.md")
+            .unwrap()
+            .1
+    );
+    assert!(!s.path(".agents").exists());
+
     let s = Sandbox::new();
     s.write(".pi/skills/doco/SKILL.md", "unrelated");
     s.err(&["init", "--agent", "pi", "--refresh"], "migrate");

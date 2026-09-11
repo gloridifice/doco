@@ -1,6 +1,6 @@
 pub mod tasks;
 use crate::{
-    Change, Project, State, markdown, safety,
+    Change, PackageMode, Project, State, markdown, package_mode, safety,
     ui::{self, Reporter, Tone},
 };
 use anyhow::{Result, bail};
@@ -41,6 +41,7 @@ pub fn pending(text: &str) -> bool {
         .unwrap()
         .is_match(text)
 }
+
 fn required(text: &str, aliases: &[&[&str]], file: &str, report: &mut Report) {
     for names in aliases {
         let sections: Vec<_> = markdown::sections(text)
@@ -91,10 +92,51 @@ pub fn proposal(text: &str, final_result: bool) -> Report {
     report
 }
 
+fn links(project: &Project, change: &Change, name: &str, text: &str, report: &mut Report) {
+    let file = change.path.join(name);
+    for target in markdown::links(text) {
+        if let Some(id) = target.strip_prefix("doco:") {
+            if let Err(error) = project.resolve(id.split('#').next().unwrap_or(id)) {
+                report.errors.push(format!(
+                    "{name}: invalid stable reference {target}: {error}"
+                ));
+            }
+        } else if let Some(path) = markdown::local_link(file.parent().unwrap(), &target) {
+            if !path.starts_with(project.root()) {
+                report
+                    .errors
+                    .push(format!("{name}: link outside project: {target}"));
+            } else if !path.exists() {
+                report.warnings.push(format!("{name}: missing local reference {target}; confirm whether it is a planned source path"));
+            }
+        }
+    }
+}
+
+fn add_blockers(report: &mut Report, blockers: Vec<String>, strict: bool) {
+    for blocker in blockers {
+        let issue = format!("unresolved blocker: {blocker}");
+        if strict {
+            report.errors.push(issue);
+        } else {
+            report.warnings.push(issue);
+        }
+    }
+}
+
 pub fn inspect(project: &Project, change: &Change, completing: bool) -> Result<Report> {
     safety::tree(project.root(), &change.path)?;
     let proposal_text = safety::text(project.root(), &change.path.join("proposal.md"))?;
+    let strict = completing || change.state == State::Completed;
     let mut report = proposal(&proposal_text, completing || change.state != State::Active);
+    let mode = match package_mode(&proposal_text) {
+        Ok(mode) => Some(mode),
+        Err(error) => {
+            report.errors.push(error.to_string());
+            None
+        }
+    };
+    links(project, change, "proposal.md", &proposal_text, &mut report);
     if change.state == State::Archived {
         for entry in std::fs::read_dir(&change.path)? {
             let entry = entry?;
@@ -107,6 +149,26 @@ pub fn inspect(project: &Project, change: &Change, completing: bool) -> Result<R
         }
         return Ok(report);
     }
+    let Some(mode) = mode else {
+        return Ok(report);
+    };
+    if mode == PackageMode::ProposalOnly {
+        let work = change.path.join("work");
+        safety::inspect(project.root(), &work)?;
+        if work.try_exists()? {
+            report
+                .errors
+                .push("proposal-only change must not contain work/".into());
+        }
+        add_blockers(&mut report, tasks::blockers(&proposal_text), strict);
+        if strict && !tasks::verification(&proposal_text) {
+            report
+                .errors
+                .push("proposal.md: missing Verification/验证记录 evidence".into());
+        }
+        return Ok(report);
+    }
+
     let implement = safety::text(project.root(), &change.path.join("work/implement.md"))?;
     let tasks_text = safety::text(project.root(), &change.path.join("work/tasks.md"))?;
     required(
@@ -138,7 +200,6 @@ pub fn inspect(project: &Project, change: &Change, completing: bool) -> Result<R
         .filter(|t| !t.done)
         .map(|t| t.id.as_str())
         .collect();
-    let strict = completing || change.state == State::Completed;
     if !unfinished.is_empty() {
         let issue = format!("unfinished tasks: {}", unfinished.join(", "));
         if strict {
@@ -150,42 +211,19 @@ pub fn inspect(project: &Project, change: &Change, completing: bool) -> Result<R
     let mut blockers = parsed.blockers;
     blockers.extend(tasks::blockers(&implement));
     blockers.extend(tasks::blockers(&proposal_text));
-    for blocker in blockers {
-        let issue = format!("unresolved blocker: {blocker}");
-        if strict {
-            report.errors.push(issue);
-        } else {
-            report.warnings.push(issue);
-        }
-    }
+    add_blockers(&mut report, blockers, strict);
     if strict && !parsed.verification {
         report
             .errors
             .push("work/tasks.md: missing Verification/验证记录 evidence".into());
     }
-    for (name, text) in [
-        ("proposal.md", &proposal_text),
-        ("work/implement.md", &implement),
-        ("work/tasks.md", &tasks_text),
-    ] {
-        let file = change.path.join(name);
-        for target in markdown::links(text) {
-            if let Some(id) = target.strip_prefix("doco:") {
-                if let Err(error) = project.resolve(id.split('#').next().unwrap_or(id)) {
-                    report.errors.push(format!(
-                        "{name}: invalid stable reference {target}: {error}"
-                    ));
-                }
-            } else if let Some(path) = markdown::local_link(file.parent().unwrap(), &target) {
-                if !path.starts_with(project.root()) {
-                    report
-                        .errors
-                        .push(format!("{name}: link outside project: {target}"));
-                } else if !path.exists() {
-                    report.warnings.push(format!("{name}: missing local reference {target}; confirm whether it is a planned source path"));
-                }
-            }
-        }
-    }
+    links(
+        project,
+        change,
+        "work/implement.md",
+        &implement,
+        &mut report,
+    );
+    links(project, change, "work/tasks.md", &tasks_text, &mut report);
     Ok(report)
 }

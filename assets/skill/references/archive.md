@@ -1,6 +1,10 @@
 <!-- doco:managed template=v1 -->
 # Archive or cancel
 
+Archive is not an implementation-history store. Full packages lose work/ and
+proposal-only packages never contain it; Git or normal delivery records must
+preserve implementation-level history.
+
 Ordinary archive accepts completed changes only. Confirm the proposal stands on
 its own and retained files do not depend on work/. Current facts were synchronized
 at completion; do not overwrite current architecture/specs from an old design.

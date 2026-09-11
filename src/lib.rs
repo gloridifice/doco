@@ -2,9 +2,12 @@ pub mod check;
 pub mod init;
 pub mod lifecycle;
 pub mod markdown;
+pub mod package;
 pub mod safety;
 pub mod templates;
 pub mod ui;
+
+pub use package::{PROPOSAL_ONLY_MARKER, PackageMode, package_mode};
 
 use anyhow::{Context, Result, bail};
 use std::{

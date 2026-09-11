@@ -26,11 +26,14 @@ fn list_counts_checkboxes_not_examples_and_tracks_lifecycle() {
     s.write("doco/changes/active/empty/work/tasks.md", "# Empty\n");
     s.ready("missing");
     fs::remove_file(s.path("doco/changes/active/missing/work/tasks.md")).unwrap();
+    s.proposal_only_ready("proposal");
+    s.proposal_only_ready("proposal-done");
+    s.ok(&["complete", "proposal-done"]);
     let before = s.files();
-    let active = "active\tempty\t0/0\t0m\nactive\tmissing\t?\t0m\nactive\tmixed\t2/3\t0m\n";
-    let completed = "completed\tcompleted\t2/2\t0m\nactive\tempty\t0/0\t0m\nactive\tmissing\t?\t0m\nactive\tmixed\t2/3\t0m\n";
-    let archived = "archived\tarchived\t-\t0m\nactive\tempty\t0/0\t0m\nactive\tmissing\t?\t0m\nactive\tmixed\t2/3\t0m\n";
-    let all = "archived\tarchived\t-\t0m\ncompleted\tcompleted\t2/2\t0m\nactive\tempty\t0/0\t0m\nactive\tmissing\t?\t0m\nactive\tmixed\t2/3\t0m\n";
+    let active = "active\tempty\t0/0\t0m\nactive\tmissing\t?\t0m\nactive\tmixed\t2/3\t0m\nactive\tproposal\t-\t0m\n";
+    let completed = "completed\tcompleted\t2/2\t0m\nactive\tempty\t0/0\t0m\nactive\tmissing\t?\t0m\nactive\tmixed\t2/3\t0m\nactive\tproposal\t-\t0m\ncompleted\tproposal-done\t-\t0m\n";
+    let archived = "archived\tarchived\t-\t0m\nactive\tempty\t0/0\t0m\nactive\tmissing\t?\t0m\nactive\tmixed\t2/3\t0m\nactive\tproposal\t-\t0m\n";
+    let all = "archived\tarchived\t-\t0m\ncompleted\tcompleted\t2/2\t0m\nactive\tempty\t0/0\t0m\nactive\tmissing\t?\t0m\nactive\tmixed\t2/3\t0m\nactive\tproposal\t-\t0m\ncompleted\tproposal-done\t-\t0m\n";
     assert_eq!(s.ok(&["list"]), active);
     assert_eq!(s.ok(&["list", "--completed"]), completed);
     assert_eq!(s.ok(&["list", "--archived"]), archived);

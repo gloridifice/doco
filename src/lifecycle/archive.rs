@@ -1,5 +1,5 @@
 use crate::{
-    Change, Project, State, check, markdown, safety,
+    Change, PackageMode, Project, State, check, markdown, package_mode, safety,
     ui::{self, Reporter, Tone},
     validate_id,
 };
@@ -134,6 +134,7 @@ pub fn archive_with_ui(
         Some((reason, disposition)) => cancellation_result(&original, reason, disposition)?,
         None => original,
     };
+    let mode = package_mode(&proposal)?;
     let report = check::proposal(&proposal, true);
     report.show_with_ui(reporter)?;
     report.ensure()?;
@@ -147,8 +148,12 @@ pub fn archive_with_ui(
         }
     }
     let work = change.path.join("work");
-    if work.exists() && !work.is_dir() {
+    safety::inspect(project.root(), &work)?;
+    if work.try_exists()? && !work.is_dir() {
         bail!("work must be a directory");
+    }
+    if mode == PackageMode::ProposalOnly && work.try_exists()? {
+        bail!("proposal-only change must not contain work/");
     }
     retained_links(project, &change, &proposal)?;
     let destination = project.path(format!("doco/changes/archived/{id}"));
@@ -187,13 +192,21 @@ pub fn archive_with_ui(
             )?;
         }
     }
-    if !work.exists() {
-        ui::line(
-            reporter,
-            Tone::Warning,
-            "RECOVERY",
-            "work/ already absent; retry will finish the move without reconstructing discarded material.",
-        )?;
+    if !work.try_exists()? {
+        match mode {
+            PackageMode::ProposalOnly => ui::line(
+                reporter,
+                Tone::Muted,
+                "WORK",
+                "No work material exists for this proposal-only change.",
+            )?,
+            PackageMode::Full => ui::line(
+                reporter,
+                Tone::Warning,
+                "RECOVERY",
+                "work/ already absent; retry will finish the move without reconstructing discarded material.",
+            )?,
+        }
     }
     ui::line(
         reporter,

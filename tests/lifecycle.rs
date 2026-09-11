@@ -59,6 +59,81 @@ fn skeleton_is_not_a_design_and_no_implicit_selection_exists() {
     assert!(s.path("doco/changes/active/goal").exists());
 }
 #[test]
+fn proposal_only_creation_and_lifecycle_never_require_work_files() {
+    let s = Sandbox::new();
+    s.init();
+    let output = s.ok(&["new", "small", "--proposal-only"]);
+    assert!(output.contains("proposal-only"));
+    assert!(s.path("doco/changes/active/small/proposal.md").exists());
+    assert!(!s.path("doco/changes/active/small/work").exists());
+    assert!(
+        s.read("doco/changes/active/small/proposal.md")
+            .starts_with("<!-- doco:change mode=proposal-only -->")
+    );
+    s.err(&["check", "small"], "template markers");
+
+    s.write(
+        "doco/changes/active/small/proposal.md",
+        "<!-- doco:change mode=proposal-only -->\n# Small\n\n## Purpose\nFix a focused behavior.\n\n## Scope and acceptance\nReturn the expected value in the focused case.\n\n## Result\nDelivered the focused fix.\n",
+    );
+    s.ok(&["check", "small"]);
+    s.err(&["complete", "small"], "missing Verification");
+    s.write(
+        "doco/changes/active/small/proposal.md",
+        &format!(
+            "{}\nVerification: focused and regression fixtures passed.\n",
+            s.read("doco/changes/active/small/proposal.md")
+        ),
+    );
+    let context = s.ok(&["context", "small"]);
+    assert!(!context.contains("missing document entry"));
+    assert!(!context.contains("work/implement.md"));
+    s.ok(&["complete", "small"]);
+    assert_eq!(
+        fs::read_dir(s.path("doco/changes/completed/small"))
+            .unwrap()
+            .count(),
+        1
+    );
+    s.ok(&["reopen", "small"]);
+    assert!(!s.path("doco/changes/active/small/work").exists());
+    s.ok(&["complete", "small"]);
+    let preview = s.ok(&["archive", "small", "--dry-run"]);
+    assert!(preview.contains("No work material exists"));
+    assert!(!preview.contains("RECOVERY"));
+    s.ok(&["archive", "small"]);
+    s.ok(&["check", "small"]);
+}
+
+#[test]
+fn proposal_only_mode_is_explicit_and_rejects_ambiguous_packages() {
+    let s = Sandbox::new();
+    s.init();
+    s.ready("full");
+    fs::remove_dir_all(s.path("doco/changes/active/full/work")).unwrap();
+    s.err(&["check", "full"], "implement.md");
+
+    s.proposal_only_ready("conflict");
+    fs::create_dir(s.path("doco/changes/active/conflict/work")).unwrap();
+    s.err(&["check", "conflict"], "must not contain work");
+
+    for marker in [
+        "<!-- doco:change mode=unknown -->",
+        "<!-- doco:change mode=proposal-only -->\n<!-- doco:change mode=proposal-only -->",
+    ] {
+        let s = Sandbox::new();
+        s.init();
+        s.proposal_only_ready("invalid");
+        let proposal = s.read("doco/changes/active/invalid/proposal.md");
+        s.write(
+            "doco/changes/active/invalid/proposal.md",
+            &proposal.replacen("<!-- doco:change mode=proposal-only -->", marker, 1),
+        );
+        s.err(&["check", "invalid"], "change mode marker");
+    }
+}
+
+#[test]
 fn incomplete_tasks_pending_results_blockers_and_missing_evidence_block_completion() {
     for (file, from, to, expected) in [
         ("work/tasks.md", "[x] 2.1", "[ ] 2.1", "unfinished tasks"),
@@ -184,6 +259,26 @@ fn cancellation_is_explicit_and_does_not_touch_code() {
     assert!(!s.path("doco/changes/completed/goal").exists());
     assert!(!s.path("doco/changes/archived/goal/work").exists());
 }
+#[test]
+fn proposal_only_cancellation_updates_and_archives_the_proposal() {
+    let s = Sandbox::new();
+    s.init();
+    s.proposal_only_ready("small");
+    let output = s.ok(&[
+        "cancel",
+        "small",
+        "--reason",
+        "No longer needed",
+        "--disposition",
+        "No code was implemented",
+    ]);
+    assert!(output.contains("No work material exists"));
+    assert!(!s.path("doco/changes/archived/small/work").exists());
+    let proposal = s.read("doco/changes/archived/small/proposal.md");
+    assert!(proposal.contains("Cancelled."));
+    assert!(proposal.contains("No code was implemented"));
+}
+
 #[test]
 fn archive_rejects_retained_dependencies_and_unknown_root_material() {
     for reference in [

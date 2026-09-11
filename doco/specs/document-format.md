@@ -1,6 +1,11 @@
 # 机械检查支持的文档格式
 
-所有 active/completed 变更必须包含 `proposal.md`、`work/implement.md`、`work/tasks.md`。archived 仅保留 proposal。标题与正文内容可使用项目约定语言；以下是第一版检查器识别的章节名，不支持任意同义改写。
+active/completed 支持两种合法形态：
+
+- 完整变更包含 `proposal.md`、`work/implement.md`、`work/tasks.md`。没有模式标记的既有变更均按完整变更解释；缺少 work 不能自动降级。
+- 仅 proposal 变更只包含 `proposal.md`，且 proposal 中必须有唯一的 `<!-- doco:change mode=proposal-only -->` 标记，`work/` 不得存在。未知或重复的 `doco:change mode=` 标记是格式错误。
+
+archived 始终只保留 proposal，并保留其模式标记。标题与正文内容可使用项目约定语言；以下是检查器识别的章节名，不支持任意同义改写。
 
 ## 必写章节
 
@@ -14,7 +19,9 @@
 
 active 的结果可以是 `Pending — not completed.`；完成与普通归档时不能仍标记为 pending/尚未完成。取消命令将结果正文更新为取消原因与代码处理方式，不以任务完成作为取消前提。
 
-implement 必须覆盖以下六节，标题可以有数字前缀：
+仅 proposal 变更在 complete 和 completed 快照检查时，还必须在 proposal 中包含非空的 `Verification:` / `验证：` / `验证记录：` 字段，或 `## Verification` / `## 验证` / `## 验证记录` / `## 执行证据` 章节。该证据应记录实际命令、结果和限制；CLI 只能确认字段存在，不能验证真实性。active 普通 check 不要求尚未执行的验证。
+
+完整变更的 implement 必须覆盖以下六节，标题可以有数字前缀：
 
 | 英文模板标题 | 中文标题 |
 |---|---|
@@ -28,6 +35,8 @@ implement 必须覆盖以下六节，标题可以有数字前缀：
 这是机械识别约定，不是设计完整性的证明。小变更可以每节只写简短的明确决定；不适用的算法/文档影响要明确说明，而不是保留空模板。
 
 ## 任务
+
+以下任务格式只适用于完整变更；仅 proposal 变更不使用任务复选框。
 
 ```markdown
 - [ ] 1.1 实现容量上限
