@@ -55,9 +55,10 @@ fn selects_only_requested_integrations_and_deduplicates() {
                 );
             }
         }
-        let before = s.files();
+        let before = s.files_without_index();
         s.ok(&args);
-        assert_eq!(s.files(), before);
+        assert_eq!(s.files_without_index(), before);
+        assert!(s.index_changes().is_empty());
     }
 }
 #[test]
@@ -106,9 +107,9 @@ fn old_managed_skill_is_upgraded_as_a_bundle_without_refresh() {
         assert_eq!(s.read(&format!(".agents/skills/doco/{file}")), *content);
     }
     assert_eq!(s.read(".agents/skills/doco/custom.txt"), "keep");
-    let before = s.files();
+    let before = s.files_without_index();
     s.init();
-    assert_eq!(s.files(), before);
+    assert_eq!(s.files_without_index(), before);
 }
 
 #[test]
@@ -158,7 +159,7 @@ fn preserves_existing_facts_crlf_bom_and_adds_agents() {
     );
     s.write("doco/specs/contract.md", "Existing contract\n");
     s.ok(&["new", "existing-goal"]);
-    let before = s.files();
+    let before = s.files_without_index();
     s.ok(&["init", "--agent", "claude", "--refresh"]);
     for (path, bytes) in before {
         assert_eq!(fs::read(s.dir.path().join(path)).unwrap(), bytes);
@@ -229,9 +230,9 @@ fn adopts_unmarked_templates_without_duplication() {
         1
     );
     assert_eq!(result.matches("<!-- DOCO:START -->").count(), 1);
-    let before = s.files();
+    let before = s.files_without_index();
     s.init();
-    assert_eq!(s.files(), before);
+    assert_eq!(s.files_without_index(), before);
     let s = Sandbox::new();
     s.write("AGENTS.md", &format!("{plain}\n{plain}"));
     s.err(&["init", "--agent", "most"], "multiple unmarked");

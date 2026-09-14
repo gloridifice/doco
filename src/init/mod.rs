@@ -7,8 +7,8 @@ pub(crate) mod skill;
 mod tests;
 
 use crate::{
-    Project, safety, templates,
-    ui::{self, Reporter},
+    Project, index, safety, templates,
+    ui::{self, Reporter, Tone},
 };
 use anyhow::{Result, bail};
 use plan::Plan;
@@ -74,10 +74,24 @@ pub fn run_with_ui(
     plan.show(project, reporter)?;
     plan.ensure_valid()?;
     if dry_run {
+        ui::line(
+            reporter,
+            Tone::Info,
+            "INDEX",
+            "Would rebuild change index cache.",
+        )?;
         ui::text(reporter, "Dry run: no files written.\n")?;
         return Ok(());
     }
     plan.apply(project, reporter)?;
+    if let Err(error) = index::rebuild_with_ui(project, reporter) {
+        ui::warning(
+            reporter,
+            &format!(
+                "Disk installation complete; change index cache was not rebuilt: {error:#}; run doco fix after resolving it"
+            ),
+        )?;
+    }
     ui::text(
         reporter,
         "Disk installation complete. Agent loading is NOT verified; check project trust and discovery/context settings in your agent.\n",

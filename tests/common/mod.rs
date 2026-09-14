@@ -7,6 +7,9 @@ use std::{
 };
 use tempfile::TempDir;
 
+/// Local cache rewritten by every successful rebuild, including repeated init.
+pub const INDEX_CACHE: &str = "doco/tmp/changes-index.csv";
+
 pub struct Sandbox {
     pub dir: TempDir,
 }
@@ -102,5 +105,32 @@ impl Sandbox {
         let mut out = BTreeMap::new();
         walk(self.dir.path(), self.dir.path(), &mut out);
         out
+    }
+
+    /// Snapshot for comparisons where a successful rebuild may rewrite the cache
+    /// timestamp; assertions about failures, dry runs and reads keep [`Self::files`].
+    pub fn files_without_index(&self) -> BTreeMap<PathBuf, Vec<u8>> {
+        let mut files = self.files();
+        files.remove(Path::new(INDEX_CACHE));
+        files
+    }
+
+    /// Raw cache bytes, or `None` when the cache was never written.
+    pub fn index_text(&self) -> Option<String> {
+        match fs::read_to_string(self.path(INDEX_CACHE)) {
+            Ok(text) => Some(text),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => panic!("cannot read the change index cache: {error}"),
+        }
+    }
+
+    /// Change records of the cache as `id=state`, proving the cache was rebuilt.
+    pub fn index_changes(&self) -> Vec<String> {
+        self.index_text()
+            .expect("change index cache is missing")
+            .lines()
+            .filter_map(|line| line.strip_prefix("change,"))
+            .map(|line| line.replace(',', "="))
+            .collect()
     }
 }

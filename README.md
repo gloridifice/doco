@@ -10,17 +10,41 @@ Requires Rust 1.85 or later.
 cargo install --path . --locked
 ```
 
+## See it in action
+
+```
+You: I wanna optimize cli's new/complete/archive/list commands speed. I think its better to add a hot cache. Give me a desgin.
+AI:  [Design]
+You: ok, create doco change
+AI:  doco new optimize-cli-commands
+    - proposal.md
+    - work/
+      - desgin.md
+      - implement.md
+      - tasks.md
+> Switch to cheaper model
+You:  Start to implement
+```
+
 ## Quick start
 
 Run `doco` from the target project root:
 
 ```sh
 # Initialize one or both integration targets.
-doco init --agent most --agent claude
+doco init
+```
 
+## Commands
+
+```
 # Refresh installed skill bundles and managed instruction entries after upgrading doco.
 doco update --dry-run
 doco update
+
+# Rebuild the local change index cache (never committed; see the note below).
+doco fix --dry-run
+doco fix
 
 # Create and inspect a full change package.
 doco new bounded-event-queue
@@ -42,6 +66,8 @@ A doco change is optional for implementation and is not an implementation-histor
 
 `--agent most` installs `.agents/skills/doco` with an `AGENTS.md` entry; `--agent claude` installs `.claude/skills/doco` with a `CLAUDE.md` entry. `doco update` refreshes only complete integrations already installed at those locations.
 
+Change lookups use a disposable cache at `doco/tmp/changes-index.csv`. It is ignored through `doco/.gitignore`, never committed, and machine-local: after cloning a project that already uses doco, `doco init` or `doco fix` rebuilds it, and every other command works without it. Only `init` and `fix` write it outside a successful lifecycle command; read-only commands and dry runs never write it.
+
 Use `--root <path>` to target another project. Use `doco --help` or `doco <command> --help` for the complete command reference. In automation, pass explicit arguments and `--no-interactive`.
 
 ## Development
@@ -51,7 +77,32 @@ cargo fmt --all --check
 cargo clippy --all-targets -- -D warnings
 cargo test --all-targets
 cargo build --release --locked
+
+# Explicit scale check for the local change index cache; ignored by default.
+cargo test --release --test scale -- --ignored --nocapture
 ```
+
+### Command performance
+
+The local change index removes the cost that grows with the number of change
+packages. Measured with the release binary on Windows 11 / Intel i7-10700, on a
+temporary project holding N minimal archived packages plus one valid target
+package, median of 2–3 runs in seconds. Every column except the last is a warm
+run (valid cache); the last one is cold (cache deleted, i.e. the old behavior of
+enumerating every change directory on each command):
+
+| Command | 0 changes | 100 | 1,000 | 10,000 | 10,000, cold |
+|---|---:|---:|---:|---:|---:|
+| `doco new` | 0.082 | 0.083 | 0.080 | 0.081 | 6.92 (85×) |
+| `doco check` | 0.058 | 0.054 | 0.062 | 0.059 | 6.29 (107×) |
+| `doco complete` | 0.100 | 0.097 | 0.123 | 0.100 | 12.50 (125×) |
+| `doco list` | 0.035 | 0.033 | 0.053 | 0.053 | 6.95 (131×) |
+| `doco list --archived` | 0.032 | 0.215 | 1.874 | 17.351 | 22.91 (1.3×) |
+| `doco archive` | 0.117 | 0.830 | 8.404 | 69.865 | 92.68 (1.3×) |
+| `doco fix` (rebuild) | 0.046 | 0.127 | 0.779 | 6.489 | — |
+
+
+`cargo test --release --test scale -- --ignored --nocapture`.
 
 ## Documentation
 
@@ -59,3 +110,4 @@ cargo build --release --locked
 - [Architecture and failure recovery](doco/architecture.md)
 - [CLI output and interaction contract](doco/specs/cli.md)
 - [Machine-readable document format](doco/specs/document-format.md)
+- [Local change index cache](doco/specs/change-index-cache.md)

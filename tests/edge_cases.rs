@@ -13,9 +13,9 @@ fn skill_bom_is_preserved_during_idempotent_install_and_refresh() {
         );
     }
     s.init();
-    let before = s.files();
+    let before = s.files_without_index();
     s.init();
-    assert_eq!(s.files(), before);
+    assert_eq!(s.files_without_index(), before);
     let file = ".agents/skills/doco/references/create.md";
     s.write(file, &format!("{}\r\nUser customization\r\n", s.read(file)));
     s.ok(&["init", "--agent", "most", "--refresh"]);
@@ -53,9 +53,9 @@ fn bom_at_managed_block_and_unmarked_body_is_preserved() {
         s.write("AGENTS.md", &text.replace('\n', "\r\n"));
         s.init();
         assert!(s.read("AGENTS.md").starts_with('\u{feff}'));
-        let before = s.files();
+        let before = s.files_without_index();
         s.init();
-        assert_eq!(s.files(), before);
+        assert_eq!(s.files_without_index(), before);
         let edited = s
             .read("AGENTS.md")
             .replace("Perform only", "Perform exactly");
@@ -152,9 +152,9 @@ fn init_reports_partial_success_without_damaging_existing_entry_and_can_retry() 
     drop(handle);
     s.init();
     assert!(s.read("AGENTS.md").starts_with(&old));
-    let before = s.files();
+    let before = s.files_without_index();
     s.init();
-    assert_eq!(s.files(), before);
+    assert_eq!(s.files_without_index(), before);
 }
 #[cfg(windows)]
 #[test]

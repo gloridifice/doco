@@ -239,6 +239,18 @@ pub fn text(reporter: &mut dyn Reporter, text: &str) -> Result<()> {
         .map_err(Into::into)
 }
 
+/// Non-fatal diagnostic on stderr; it never changes the command outcome.
+pub(crate) fn warning(reporter: &mut dyn Reporter, body: &str) -> Result<()> {
+    reporter
+        .emit(Event::Line {
+            stream: Stream::Stderr,
+            tone: Tone::Warning,
+            label: "WARNING",
+            body,
+        })
+        .map_err(Into::into)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

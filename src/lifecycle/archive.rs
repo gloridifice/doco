@@ -1,5 +1,5 @@
 use crate::{
-    Change, PackageMode, Project, State, check, markdown, package_mode, safety,
+    Change, PackageMode, Project, State, check, index, markdown, package_mode, safety,
     ui::{self, Reporter, Tone},
     validate_id,
 };
@@ -230,6 +230,8 @@ pub fn archive_with_ui(
     }
     safety::verify(project.root(), &proposal_path, &snapshot)?;
     retained_links(project, &change, &proposal)?;
+    let mut entries = index::load(project)?;
+    index::invalidate(project, &_lock)?;
     if cancellation.is_some() {
         safety::atomic_write(
             project.root(),
@@ -299,6 +301,8 @@ pub fn archive_with_ui(
             destination.display()
         );
     }
+    entries.insert(id.to_string(), State::Archived);
+    index::publish_after_commit(project, &_lock, &entries, reporter)?;
     ui::text(
         reporter,
         &format!(

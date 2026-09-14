@@ -3,6 +3,7 @@
 - [架构](architecture.md)：模块职责、持久状态、文件安全与恢复边界。
 - [CLI 输出与交互](specs/cli.md)：颜色、TTY 布局、菜单、退出码及破坏性命令行为。
 - [文档格式](specs/document-format.md)：CLI 能机械识别的章节、任务和引用格式。
+- [变更索引缓存](specs/change-index-cache.md)：本机派生缓存的文件格式、失效条件和信任边界。
 - 精确命令参数以 `doco --help`、源码及集成测试为准；工作流规则由 [随工具发布的 skill](../assets/skill/SKILL.md) 提供。
 
 当前文档只描述已实现的功能；历史材料不能覆盖当前契约。

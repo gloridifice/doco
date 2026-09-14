@@ -5,7 +5,7 @@ use crate::terminal::{
 use anyhow::{Result, bail};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum, error::ErrorKind};
 use doco::{
-    Change, Project, State, init, lifecycle,
+    Change, Project, State, fix, init, lifecycle,
     ui::{self, Event, Reporter, Tone},
     update,
 };
@@ -61,6 +61,11 @@ enum Command {
         /// Replace only recognized doco-managed integration content
         #[arg(long)]
         refresh: bool,
+    },
+    /// Rebuild the disposable local change index cache used for fast lookups
+    Fix {
+        #[arg(long)]
+        dry_run: bool,
     },
     /// Create a tracked change skeleton; implementation history belongs in Git/PRs
     New {
@@ -227,6 +232,7 @@ fn execute(
         Command::Update { dry_run, refresh } => {
             update::run_with_ui(&project, dry_run, refresh, &mut reporter)
         }
+        Command::Fix { dry_run } => fix::run_with_ui(&project, dry_run, &mut reporter),
         Command::New { id, proposal_only } => lifecycle::new_change_in_mode_with_ui(
             &project,
             &id,
@@ -339,6 +345,7 @@ impl Cli {
             | Command::Context { id, .. } => id.is_none(),
             Command::Init { .. }
             | Command::Update { .. }
+            | Command::Fix { .. }
             | Command::New { .. }
             | Command::List { .. } => false,
         };

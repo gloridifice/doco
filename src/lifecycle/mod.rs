@@ -2,7 +2,7 @@ mod archive;
 mod context;
 mod list;
 use crate::{
-    PackageMode, Project, State, check as validation, package_mode, safety, templates,
+    PackageMode, Project, State, check as validation, index, package_mode, safety, templates,
     ui::{self, Reporter},
     validate_id,
 };
@@ -29,12 +29,12 @@ pub fn new_change_in_mode_with_ui(
 ) -> Result<()> {
     validate_id(id)?;
     project.initialized()?;
-    let _lock = safety::Lock::acquire(project.root())?;
-    if project.changes()?.iter().any(|c| c.id == id) {
-        bail!("change ID {id} already exists; choose an explicit new ID");
-    }
+    let lock = safety::Lock::acquire(project.root())?;
+    let mut entries = index::load(project)?;
+    index::ensure_absent(project, id, &mut entries)?;
     let destination = project.path(format!("doco/changes/active/{id}"));
     safety::inspect(project.root(), &destination)?;
+    index::invalidate(project, &lock)?;
     let temporary = tempfile::Builder::new()
         .prefix(".new-")
         .tempdir_in(project.path("doco/tmp"))?;
@@ -60,6 +60,8 @@ pub fn new_change_in_mode_with_ui(
         }
     }
     safety::move_directory(project.root(), temporary.path(), &destination)?;
+    entries.insert(id.to_string(), State::Active);
+    index::publish_after_commit(project, &lock, &entries, reporter)?;
     let files = match mode {
         PackageMode::Full => "proposal.md, work/implement.md, work/tasks.md",
         PackageMode::ProposalOnly => "proposal.md (proposal-only)",
@@ -101,7 +103,7 @@ pub fn complete(project: &Project, id: &str) -> Result<()> {
 pub fn complete_with_ui(project: &Project, id: &str, reporter: &mut dyn Reporter) -> Result<()> {
     project.initialized()?;
     validate_id(id)?;
-    let _lock = safety::Lock::acquire(project.root())?;
+    let lock = safety::Lock::acquire(project.root())?;
     let change = project.resolve(id)?;
     if change.state != State::Active {
         bail!("complete requires active; {id} is {}", change.state);
@@ -117,11 +119,15 @@ pub fn complete_with_ui(project: &Project, id: &str, reporter: &mut dyn Reporter
     if safety::tree(project.root(), &change.path)? != before {
         bail!("work package changed during completion checks; retry");
     }
+    let mut entries = index::load(project)?;
+    index::invalidate(project, &lock)?;
     safety::move_directory(
         project.root(),
         &change.path,
         &project.path(format!("doco/changes/completed/{id}")),
     )?;
+    entries.insert(id.to_string(), State::Completed);
+    index::publish_after_commit(project, &lock, &entries, reporter)?;
     ui::text(
         reporter,
         &format!(
@@ -143,7 +149,7 @@ pub fn reopen(project: &Project, id: &str) -> Result<()> {
 pub fn reopen_with_ui(project: &Project, id: &str, reporter: &mut dyn Reporter) -> Result<()> {
     project.initialized()?;
     validate_id(id)?;
-    let _lock = safety::Lock::acquire(project.root())?;
+    let lock = safety::Lock::acquire(project.root())?;
     let change = project.resolve(id)?;
     if change.state != State::Completed {
         bail!(
@@ -165,11 +171,15 @@ pub fn reopen_with_ui(project: &Project, id: &str, reporter: &mut dyn Reporter) 
             }
         }
     }
+    let mut entries = index::load(project)?;
+    index::invalidate(project, &lock)?;
     safety::move_directory(
         project.root(),
         &change.path,
         &project.path(format!("doco/changes/active/{id}")),
     )?;
+    entries.insert(id.to_string(), State::Active);
+    index::publish_after_commit(project, &lock, &entries, reporter)?;
     ui::text(
         reporter,
         &format!(

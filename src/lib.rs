@@ -1,4 +1,6 @@
 pub mod check;
+pub mod fix;
+pub(crate) mod index;
 pub mod init;
 pub mod lifecycle;
 pub mod markdown;
@@ -12,7 +14,6 @@ pub use package::{PROPOSAL_ONLY_MARKER, PackageMode, package_mode};
 
 use anyhow::{Context, Result, bail};
 use std::{
-    collections::BTreeMap,
     fmt, fs,
     path::{Path, PathBuf},
 };
@@ -81,36 +82,10 @@ impl Project {
         Ok(())
     }
     pub fn changes(&self) -> Result<Vec<Change>> {
-        self.initialized()?;
-        let mut found = BTreeMap::<String, Change>::new();
-        for state in State::ALL {
-            let parent = self.path(format!("doco/changes/{state}"));
-            for entry in fs::read_dir(&parent)? {
-                let entry = entry?;
-                let path = entry.path();
-                safety::inspect(&self.root, &path)?;
-                let id = entry
-                    .file_name()
-                    .into_string()
-                    .map_err(|_| anyhow::anyhow!("non-UTF-8 change ID"))?;
-                validate_id(&id)?;
-                if !entry.file_type()?.is_dir() {
-                    bail!("unexpected file in lifecycle directory: {}", path.display());
-                }
-                if let Some(previous) = found.get(&id) {
-                    bail!("duplicate change ID {id}: {} and {state}", previous.state);
-                }
-                found.insert(id.clone(), Change { id, state, path });
-            }
-        }
-        Ok(found.into_values().collect())
+        index::entries(self)
     }
     pub fn resolve(&self, id: &str) -> Result<Change> {
-        validate_id(id)?;
-        self.changes()?
-            .into_iter()
-            .find(|c| c.id == id)
-            .with_context(|| format!("unknown change ID: {id}"))
+        index::resolve(self, id)
     }
 }
 

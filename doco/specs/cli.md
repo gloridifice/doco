@@ -36,6 +36,14 @@ CLI 内置版本严格高于已安装版本时，普通 `init` 或 `update` 无�
 
 每个 skill 目录独立提交：先写 references 和模板，最后写根 `SKILL.md`。可捕获的组内写入失败会逆序恢复本次已改文件，并删除本次新建的文件和空目录；成功回滚输出 `ROLLED BACK` 并以失败状态退出。入口文件在 bundle 之后独立写入，不参与该回滚组。回滚失败或检测到外部并发修改时输出 `ROLLBACK FAILED` 和未恢复路径，不覆盖无法确认归属的当前内容。该保证不跨不同 skill 目录、入口文件或项目文档，也不覆盖强制终止、断电和持续文件系统故障。
 
+## 变更索引缓存
+
+`init` 在集成安装成功后重建本机变更索引缓存，即使受管文件全部为 SKIP。扫描前在 stdout 输出 `INDEX Building change index cache...` 并刷新，完成后输出 `INDEX Cache built: <n> active, <n> completed, <n> archived.`。缓存步骤失败不撤销已成功的安装：stderr 输出 WARNING，说明安装已完成、缓存未重建及修复方式，命令仍以 0 退出。`init --dry-run` 只在计划中输出 `INDEX Would rebuild change index cache.`。
+
+`doco fix` 只重建索引：在写锁内先撤销旧缓存，再权威扫描并原子写入，不修改文档、不移动或删除工作包、不自动解决重复 ID。未初始化项目提示先运行 `doco init`，且不创建任何文件。成功输出同样包含 Building 和 Cache built 两行。`fix --dry-run` 校验项目并扫描计数，输出 `INDEX Would rebuild cache: ...`，不获取写锁、不写缓存、不创建 tmp；重建失败退出 1。
+
+`new`、`complete`、`reopen`、`archive`、`cancel` 在成功提交后更新缓存。缓存不可用不影响业务结果：命令仍成功退出 0，只在 stderr 警告并提示 `doco fix`。只读命令（`list`、`context`、`check`）缺少缓存时扫描到内存，不持久化也不加写锁；`list` 的 stdout 不包含缓存诊断。缓存格式、失效条件和信任边界见[变更索引缓存](change-index-cache.md)。
+
 ## 交互范围
 
 `--interactive` 和 `--no-interactive` 互斥。只有以下情况会打开菜单：
@@ -43,7 +51,7 @@ CLI 内置版本严格高于已安装版本时，普通 `init` 或 `update` 无�
 - `init` 未提供 `--agent`：在可交互终端多选 Most agents（`.agents` / `AGENTS.md`）和 Claude（`.claude` / `CLAUDE.md`）。
 - `context`、`check`、`complete`、`archive`、`reopen`、`cancel` 省略变更 ID 且显式提供 `--interactive`：按命令所需生命周期状态选择已有变更。
 
-`update`、`new` 始终不提供交互输入。明确传入已有变更 ID 时不打开菜单，即使同时存在 `--interactive`。`--yes` 不选择目标或补充参数。
+`update`、`fix`、`new` 始终不提供交互输入。明确传入已有变更 ID 时不打开菜单，即使同时存在 `--interactive`。`--yes` 不选择目标或补充参数。
 
 菜单使用方向键移动、Space 切换多选、Esc、Ctrl-C 或 q 取消。多选菜单按 Enter 时先把当前高亮项纳入选择，再立即提交全部已选择项；已选择的当前项不会被反选，先前用 Space 选择的项会保留。单选菜单按 Enter 直接提交当前项。单一候选也必须 Enter 提交，不会自动执行。每页最多显示 10 项，并根据终端高度缩小。菜单写 stderr，不从重定向 stdin 读取；交互要求 stdin、stdout、stderr 都是 TTY 且 `TERM` 不为 `dumb`。菜单取消退出 130，业务或 IO 错误退出 1，Clap 参数错误退出 2。
 
@@ -57,4 +65,4 @@ CLI 内置版本严格高于已安装版本时，普通 `init` 或 `update` 无�
 
 仅 proposal 变更不存在 work 是正常状态，预览显示说明而非 `RECOVERY`；完整变更若已在先前失败中删除 work，仍显示 `RECOVERY` 并允许完成剩余移动。模式标记与 work 同时存在时拒绝归档。
 
-删除仍不递归跟随链接。部分清理或移动失败时，按输出的 APPLIED / DELETED 路径和错误说明修复后重试；命令不承诺代码回滚、Git 操作或跨文件事务。archive 最终只保留 proposal，不是实现历史存储。
+删除仍不递归跟随链接。部分清理或移动失败时，按输出的 APPLIED / DELETED 路径和错误说明修复后重试；此时缓存已被撤销，重试会重新扫描目录。命令不承诺代码回滚、Git 操作或跨文件事务。archive 最终只保留 proposal，不是实现历史存储。
