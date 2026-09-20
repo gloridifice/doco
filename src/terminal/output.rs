@@ -86,7 +86,7 @@ impl<O: Write, E: Write> TerminalReporter<O, E> {
                     ),
                     sanitize_line(&change.id),
                     change.tasks,
-                    change.updated
+                    change.age
                 )?;
             }
             return Ok(());
@@ -112,7 +112,7 @@ impl<O: Write, E: Write> TerminalReporter<O, E> {
                 heading.apply_to(format!("{:<9}", "STATE")),
                 heading.apply_to(format!("{:<id_width$}", "CHANGE")),
                 heading.apply_to(format!("{:<tasks_width$}", "TASKS")),
-                heading.apply_to("UPDATED")
+                heading.apply_to("AGE")
             )?;
             for change in changes {
                 let state = format!("{:<9}", change.state.as_str());
@@ -123,7 +123,7 @@ impl<O: Write, E: Write> TerminalReporter<O, E> {
                     Self::styled(&state, Self::state(change), self.stdout_color),
                     sanitize_line(&change.id),
                     tasks,
-                    change.updated
+                    change.age
                 )?;
             }
         } else {
@@ -138,7 +138,7 @@ impl<O: Write, E: Write> TerminalReporter<O, E> {
                     ),
                     sanitize_line(&change.id),
                     change.tasks,
-                    change.updated
+                    change.age
                 )?;
             }
         }
@@ -218,7 +218,7 @@ impl<O: Write, E: Write> Reporter for TerminalReporter<O, E> {
 mod tests {
     use super::*;
     use doco::ui::Event;
-    use doco::ui::{ModifiedAge, TaskCount};
+    use doco::ui::{LifecycleAge, TaskCount};
     use std::time::Duration;
 
     fn caps(tty: bool, columns: usize) -> TerminalCapabilities {
@@ -239,13 +239,13 @@ mod tests {
                 id: "alpha".into(),
                 state: State::Active,
                 tasks: TaskCount::Known { done: 1, total: 3 },
-                updated: ModifiedAge::Known(Duration::from_secs(10 * 60)),
+                age: LifecycleAge::Known(Duration::from_secs(10 * 60)),
             },
             ChangeRow {
                 id: "done".into(),
                 state: State::Completed,
                 tasks: TaskCount::Known { done: 2, total: 2 },
-                updated: ModifiedAge::Known(Duration::from_secs(26 * 60 * 60)),
+                age: LifecycleAge::Known(Duration::from_secs(26 * 60 * 60)),
             },
         ]
     }
@@ -277,7 +277,7 @@ mod tests {
             .unwrap();
         let (stdout, _) = reporter.into_inner();
         let text = String::from_utf8(stdout).unwrap();
-        assert!(text.starts_with("STATE      CHANGE  TASKS  UPDATED\n"));
+        assert!(text.starts_with("STATE      CHANGE  TASKS  AGE\n"));
         assert!(text.contains("active     alpha   1/3    10m\n"), "{text:?}");
         assert!(
             text.contains("completed  done    2/2    1d2h\n"),

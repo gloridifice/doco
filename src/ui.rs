@@ -22,12 +22,12 @@ pub enum Tone {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ModifiedAge {
+pub enum LifecycleAge {
     Known(std::time::Duration),
     Unknown,
 }
 
-impl fmt::Display for ModifiedAge {
+impl fmt::Display for LifecycleAge {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self::Known(duration) = self else {
             return f.write_str("?");
@@ -67,12 +67,14 @@ impl fmt::Display for TaskCount {
     }
 }
 
+pub type ModifiedAge = LifecycleAge;
+
 #[derive(Debug)]
 pub struct ChangeRow {
     pub id: String,
     pub state: State,
     pub tasks: TaskCount,
-    pub updated: ModifiedAge,
+    pub age: LifecycleAge,
 }
 
 pub enum Event<'a> {
@@ -206,7 +208,7 @@ impl<O: Write, E: Write> Reporter for PlainReporter<O, E> {
                         change.state,
                         sanitize_line(&change.id),
                         change.tasks,
-                        change.updated
+                        change.age
                     )?;
                 }
                 Ok(())
@@ -256,7 +258,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn modified_age_uses_compact_whole_units() {
+    fn lifecycle_age_uses_compact_whole_units() {
         use std::time::Duration;
 
         for (seconds, expected) in [
@@ -271,11 +273,11 @@ mod tests {
             ((20 * 24 + 5) * 60 * 60, "20d5h"),
         ] {
             assert_eq!(
-                ModifiedAge::Known(Duration::from_secs(seconds)).to_string(),
+                LifecycleAge::Known(Duration::from_secs(seconds)).to_string(),
                 expected
             );
         }
-        assert_eq!(ModifiedAge::Unknown.to_string(), "?");
+        assert_eq!(LifecycleAge::Unknown.to_string(), "?");
     }
 
     #[test]

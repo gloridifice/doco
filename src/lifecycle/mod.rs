@@ -2,11 +2,12 @@ mod archive;
 mod context;
 mod list;
 use crate::{
-    PackageMode, Project, State, check as validation, index, package_mode, safety, templates,
+    LifecycleEvent, PackageMode, Project, State, check as validation, index, lifecycle_times,
+    now_utc, package_mode, safety, set_lifecycle_event, templates,
     ui::{self, Reporter},
     validate_id,
 };
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 pub use archive::{archive, archive_with_ui};
 pub use context::{context, context_with_ui};
 pub use list::{list_changes, list_changes_filtered};
@@ -42,6 +43,7 @@ pub fn new_change_in_mode_with_ui(
         PackageMode::Full => templates::change_file("proposal.md", id),
         PackageMode::ProposalOnly => templates::proposal_only_file(id),
     };
+    let proposal = set_lifecycle_event(&proposal, LifecycleEvent::Created, now_utc()?)?;
     safety::atomic_write(
         project.root(),
         &temporary.path().join("proposal.md"),
@@ -109,23 +111,36 @@ pub fn complete_with_ui(project: &Project, id: &str, reporter: &mut dyn Reporter
         bail!("complete requires active; {id} is {}", change.state);
     }
     let before = safety::tree(project.root(), &change.path)?;
-    let mode = package_mode(&safety::text(
-        project.root(),
-        &change.path.join("proposal.md"),
-    )?)?;
+    let proposal_path = change.path.join("proposal.md");
+    let proposal_snapshot =
+        safety::snapshot(project.root(), &proposal_path)?.context("missing proposal.md")?;
+    let proposal = safety::decode(&proposal_snapshot.bytes)?;
+    let mode = package_mode(&proposal)?;
+    lifecycle_times(&proposal)?;
     let report = validation::inspect(project, &change, true)?;
     report.show_with_ui(reporter)?;
     report.ensure()?;
     if safety::tree(project.root(), &change.path)? != before {
         bail!("work package changed during completion checks; retry");
     }
+    let completed_proposal = set_lifecycle_event(&proposal, LifecycleEvent::Completed, now_utc()?)?;
     let mut entries = index::load(project)?;
     index::invalidate(project, &lock)?;
-    safety::move_directory(
+    safety::atomic_write(
+        project.root(),
+        &proposal_path,
+        &Some(proposal_snapshot),
+        completed_proposal.as_bytes(),
+    )?;
+    if let Err(error) = safety::move_directory(
         project.root(),
         &change.path,
         &project.path(format!("doco/changes/completed/{id}")),
-    )?;
+    ) {
+        bail!(
+            "completion timestamp was recorded but the move failed: {error:#}; source remains active, retry complete"
+        );
+    }
     entries.insert(id.to_string(), State::Completed);
     index::publish_after_commit(project, &lock, &entries, reporter)?;
     ui::text(

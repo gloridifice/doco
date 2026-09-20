@@ -49,6 +49,52 @@ fn list_counts_checkboxes_not_examples_and_tracks_lifecycle() {
 }
 
 #[test]
+fn list_uses_persisted_lifecycle_time_and_legacy_packages_stay_unknown() {
+    let s = Sandbox::new();
+    s.init();
+    s.ready("persisted");
+    let path = "doco/changes/active/persisted/proposal.md";
+    let proposal = s.read(path);
+    let proposal = proposal
+        .lines()
+        .map(|line| {
+            if line.starts_with("<!-- doco:lifecycle ") {
+                "<!-- doco:lifecycle v=1 created-at=2000-01-01T00:00:00Z completed-at=- archived-at=- -->"
+            } else {
+                line
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n";
+    s.write(path, &proposal);
+    s.write(
+        "doco/changes/active/persisted/work/tasks.md",
+        "# Recently edited\n",
+    );
+    let output = s.ok(&["list"]);
+    let age = output.trim_end().rsplit('\t').next().unwrap();
+    assert!(
+        age.contains('d'),
+        "persisted event age expected: {output:?}"
+    );
+    assert_ne!(age, "0m");
+
+    s.ready("legacy");
+    let legacy_path = "doco/changes/active/legacy/proposal.md";
+    let legacy = s
+        .read(legacy_path)
+        .lines()
+        .filter(|line| !line.starts_with("<!-- doco:lifecycle "))
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n";
+    s.write(legacy_path, &legacy);
+    let output = s.ok(&["list"]);
+    assert!(output.contains("active\tlegacy\t2/2\t?\n"), "{output:?}");
+}
+
+#[test]
 fn hidden_states_are_not_read_until_their_flag_is_enabled() {
     let s = Sandbox::new();
     s.init();

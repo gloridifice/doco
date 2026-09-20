@@ -1,5 +1,6 @@
 use crate::{
-    Change, PackageMode, Project, State, check, index, markdown, package_mode, safety,
+    Change, LifecycleEvent, PackageMode, Project, State, check, index, lifecycle_times, markdown,
+    now_utc, package_mode, safety, set_lifecycle_event,
     ui::{self, Reporter, Tone},
     validate_id,
 };
@@ -130,6 +131,7 @@ pub fn archive_with_ui(
     let proposal_path = change.path.join("proposal.md");
     let snapshot = safety::snapshot(project.root(), &proposal_path)?;
     let original = safety::decode(&snapshot.as_ref().context("missing proposal.md")?.bytes)?;
+    lifecycle_times(&original)?;
     let proposal = match cancellation {
         Some((reason, disposition)) => cancellation_result(&original, reason, disposition)?,
         None => original,
@@ -166,6 +168,12 @@ pub fn archive_with_ui(
         Tone::Info,
         "RETAIN",
         &format!("{} (complete proposal)", proposal_path.display()),
+    )?;
+    ui::line(
+        reporter,
+        Tone::Info,
+        "UPDATE",
+        "proposal lifecycle archived-at at execution time",
     )?;
     if cancellation.is_some() {
         ui::line(
@@ -230,25 +238,29 @@ pub fn archive_with_ui(
     }
     safety::verify(project.root(), &proposal_path, &snapshot)?;
     retained_links(project, &change, &proposal)?;
+    let proposal = set_lifecycle_event(&proposal, LifecycleEvent::Archived, now_utc()?)?;
     let mut entries = index::load(project)?;
     index::invalidate(project, &_lock)?;
-    if cancellation.is_some() {
-        safety::atomic_write(
-            project.root(),
-            &proposal_path,
-            &snapshot,
-            proposal.as_bytes(),
-        )?;
-        ui::line(
-            reporter,
-            Tone::Success,
-            "APPLIED",
-            &format!(
-                "cancellation result; source remains {} until cleanup and move succeed",
-                change.path.display()
-            ),
-        )?;
-    }
+    safety::atomic_write(
+        project.root(),
+        &proposal_path,
+        &snapshot,
+        proposal.as_bytes(),
+    )?;
+    ui::line(
+        reporter,
+        Tone::Success,
+        "APPLIED",
+        &format!(
+            "archive timestamp{}; source remains {} until cleanup and move succeed",
+            if cancellation.is_some() {
+                " and cancellation result"
+            } else {
+                ""
+            },
+            change.path.display()
+        ),
+    )?;
     // Remove only preflighted entries, bottom-up. Newly added files make rmdir fail
     // instead of being silently swept up by a broad recursive removal.
     for entry in before.iter().rev().filter(|e| e.path.starts_with(&work)) {

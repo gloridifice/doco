@@ -158,7 +158,7 @@ fn init_reports_partial_success_without_damaging_existing_entry_and_can_retry() 
 }
 #[cfg(windows)]
 #[test]
-fn completed_proposal_survives_move_failure_after_work_cleanup() {
+fn archive_timestamp_write_failure_preserves_completed_package_for_retry() {
     use std::{fs, os::windows::fs::OpenOptionsExt};
     let s = Sandbox::new();
     s.init();
@@ -171,13 +171,12 @@ fn completed_proposal_survives_move_failure_after_work_cleanup() {
         .share_mode(3)
         .open(&path)
         .unwrap();
-    s.err(&["archive", "goal", "--yes"], "archive move failed");
+    s.err(&["archive", "goal", "--yes"], "atomic replace");
     assert_eq!(fs::read(&path).unwrap(), old);
-    assert!(!s.path("doco/changes/completed/goal/work").exists());
+    assert!(s.path("doco/changes/completed/goal/work").exists());
     drop(handle);
     s.ok(&["archive", "goal", "--yes"]);
-    assert_eq!(
-        fs::read(s.path("doco/changes/archived/goal/proposal.md")).unwrap(),
-        old
-    );
+    let archived = fs::read_to_string(s.path("doco/changes/archived/goal/proposal.md")).unwrap();
+    assert!(!archived.contains("archived-at=-"));
+    assert!(archived.contains("# Bounded queue"));
 }

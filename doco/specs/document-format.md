@@ -5,7 +5,21 @@ active/completed 支持两种合法形态：
 - 完整变更包含 `proposal.md`、`work/implement.md`、`work/tasks.md`。没有模式标记的既有变更均按完整变更解释；缺少 work 不能自动降级。
 - 仅 proposal 变更只包含 `proposal.md`，且 proposal 中必须有唯一的 `<!-- doco:change mode=proposal-only -->` 标记，`work/` 不得存在。未知或重复的 `doco:change mode=` 标记是格式错误。
 
-archived 始终只保留 proposal，并保留其模式标记。标题与正文内容可使用项目约定语言；以下是检查器识别的章节名，不支持任意同义改写。
+archived 始终只保留 proposal，并保留其模式标记和生命周期时间。标题与正文内容可使用项目约定语言；以下是检查器识别的章节名，不支持任意同义改写。
+
+## 生命周期时间
+
+CLI 新建的 proposal 在标题前包含唯一单行标记：
+
+```md
+<!-- doco:lifecycle v=1 created-at=2026-09-14T10:00:00Z completed-at=- archived-at=- -->
+```
+
+三个字段使用 RFC3339 时间或 `-`，时间精确到整秒；CLI 写出时统一使用 UTC `Z`。`new` 写 created-at；`complete` 写或覆盖 completed-at；`archive` 和 `cancel` 写 archived-at；`reopen` 不改时间。该标记只记录列表显示所需的事件时间，生命周期状态仍只由工作包所在目录决定。
+
+没有标记的既有 proposal 合法，未知事件不会从文件系统或 Git 推断。后续生命周期命令插入标记时，只填写本次实际发生的事件，其他未知字段保持 `-`。代码围栏内的示例不是标记；代码围栏外重复标记、未知版本、字段缺失或顺序错误、非法 RFC3339 和分数秒均为格式错误。系统时钟可能回拨，因此检查器不强制三个时间单调递增。
+
+完整包的标记通常为 proposal 第一行；proposal-only 先保留 mode 标记，生命周期标记紧随其后。工具更新标记时保留 proposal 的其余内容和换行风格。归档仍只保留一个 `proposal.md` 文件。
 
 ## 必写章节
 

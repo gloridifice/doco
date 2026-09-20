@@ -1,6 +1,6 @@
 pub mod tasks;
 use crate::{
-    Change, PackageMode, Project, State, markdown, package_mode, safety,
+    Change, PackageMode, Project, State, lifecycle_times, markdown, package_mode, safety,
     ui::{self, Reporter, Tone},
 };
 use anyhow::{Result, bail};
@@ -136,6 +136,9 @@ pub fn inspect(project: &Project, change: &Change, completing: bool) -> Result<R
             None
         }
     };
+    if let Err(error) = lifecycle_times(&proposal_text) {
+        report.errors.push(error.to_string());
+    }
     links(project, change, "proposal.md", &proposal_text, &mut report);
     if change.state == State::Archived {
         for entry in std::fs::read_dir(&change.path)? {

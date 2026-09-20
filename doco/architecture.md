@@ -22,23 +22,25 @@ main → cli (clap) → terminal（console）
 - `src/lib.rs` 提供项目根、稳定 ID 和从目录推导的状态模型，`Project::changes` 与 `Project::resolve` 通过 index 查询；`src/index.rs` 维护可丢弃的本机 CSV 索引 `doco/tmp/changes-index.csv`，只缓存 `doco/changes` 直接子目录的 ID 与状态，读取时要求三个状态目录修改时间与缓存逐项相等，否则回退权威扫描；指定 ID 始终核对真实路径；写命令在业务提交前撤销缓存、提交后原子重写。`src/fix.rs` 是显式强制重建入口。`src/package.rs` 定义共享的工作包模式、显式标记和兼容解析，供模板、检查及各生命周期读取复用。
 - `src/init/` 将全部目标规划为 CREATE/UPDATE/SKIP 或 CONFLICT，处理脚手架、受管入口、原生 skill 安装和有限的导入去重。安装目标只有 Most agents（`.agents` / `AGENTS.md`）与 Claude（`.claude` / `CLAUDE.md`）。根 `SKILL.md` 是 bundle 唯一版本源，DOCO 入口块有独立模板版本；内置版本较高时自动刷新，同版本差异或强制降级要求 `--refresh`。每个 skill 目录使用独立的可回滚文件组，其他文件先写、根 skill 最后提交。
 - `src/update.rs` 检测上述两个既有完整集成并复用 init 的 integration/plan/entry/skill 路径，只更新 skill bundle 和入口文件，不创建缺失集成或项目文档。旧 `.pi`、`.codex` skill 路径是迁移冲突；Claude 只导入 `AGENTS.md` 时复用 Most agents，不视为独立 Claude 集成。
-- `src/check/` 解析 proposal 中显式的工作包模式，检查文档结构、模板残留、任务格式、依赖和明确的阻塞/证据字段，不评价设计质量或测试真实性。无模式标记兼容为完整包；proposal-only 必须完全没有 work，严格完成检查从 proposal 读取验证证据。
-- `src/lifecycle/` 执行创建、上下文选择和状态迁移；归档清理与一般迁移分开实现。CLI list 默认请求 active，并用独立开关追加 completed/archived；`list_changes_filtered` 在摘要 IO 前过滤状态，再通过 safety 读取 active/completed proposal 模式，完整包复用 check 的任务解析器生成已完成/总数，proposal-only 显示不适用，并安全遍历可见工作包、以统一查询时刻计算最新 mtime 的紧凑距今时长。Reporter 只渲染已收集的行，兼容的 `list_changes` 库入口仍返回全部状态；Project 状态模型与菜单候选查询不读取这些摘要。五种状态迁移在写锁内按“预检 → 撤销缓存 → 业务提交 → 发布缓存”维护索引，业务提交后的缓存失败只警告。
+- `src/check/` 解析 proposal 中显式的工作包模式和可选生命周期时间标记，检查文档结构、模板残留、任务格式、依赖和明确的阻塞/证据字段，不评价设计质量或测试真实性。无模式标记兼容为完整包；缺少生命周期标记兼容为旧包；proposal-only 必须完全没有 work，严格完成检查从 proposal 读取验证证据。
+- `src/lifecycle/` 执行创建、上下文选择和状态迁移；归档清理与一般迁移分开实现。CLI list 默认请求 active，并用独立开关追加 completed/archived；`list_changes_filtered` 在摘要 IO 前过滤状态，再通过 safety 读取 proposal 模式和生命周期时间，完整包复用 check 的任务解析器生成已完成/总数，proposal-only 显示不适用。列表按当前状态选择 created-at/completed-at/archived-at，以统一查询时刻计算紧凑年龄，不读取工作包 mtime。Reporter 只渲染已收集的行，兼容的 `list_changes` 库入口仍返回全部状态；Project 状态模型与菜单候选查询不读取这些摘要。五种状态迁移在写锁内按“预检 → 撤销缓存 → 业务提交 → 发布缓存”维护索引，业务提交后的缓存失败只警告。
 - `src/markdown.rs` 使用 CommonMark 解析器定位代码区和链接，辅以保守的标记/章节解析，不整体格式化用户文件。
 - `src/safety.rs` 集中文件归属检查、写锁、并发复核、同目录临时文件原子替换和目录操作。
 - `assets/skill/` 是唯一工作流模板来源，通过 `include_str!` 编译进二进制。不同 Agent 安装普通文件副本，不依赖运行时源码目录或符号链接。
 
 ## 持久化与生命周期
 
-没有数据库、中央索引或复制状态的 front matter。状态仅来自 `doco/changes/{active,completed,archived}/<id>`，三个目录之间 ID 必须唯一。ID 使用小写 ASCII 字母、数字和单个内部连字符，长度不超过 80；拒绝 Windows 保留设备名。
+没有数据库、中央索引或复制状态的 front matter。状态仅来自 `doco/changes/{active,completed,archived}/<id>`，三个目录之间 ID 必须唯一；proposal 中的生命周期时间只用于显示，不能授权或推断状态。ID 使用小写 ASCII 字母、数字和单个内部连字符，长度不超过 80；拒绝 Windows 保留设备名。
+
+新工作包的 proposal 包含单行 `doco:lifecycle v=1` HTML 注释，以 UTC RFC3339 秒精度保存 created-at、completed-at、archived-at。new 写创建时间，complete 写或覆盖最近完成时间，archive/cancel 写归档时间；reopen 保留已有字段。标记随 proposal 进入版本控制并在归档后保留。旧包可没有标记，列表显示未知；非法或重复标记是格式错误。索引不缓存这些时间。
 
 `doco/tmp/changes-index.csv` 是上述目录的派生缓存，不是第二个事实来源：它只保存 ID、状态和三个状态目录的修改时间快照，被忽略、可删除、不跨机器共享。缓存命中时批量查询跳过目录枚举，但指定 ID 的创建和迁移仍核对真实路径；缓存的格式、失效与信任边界见 [变更索引缓存](specs/change-index-cache.md)。
 
-active/completed 有两种合法形态。完整包包含 `proposal.md`、`work/implement.md` 和 `work/tasks.md`，没有模式标记的既有包均按完整包解释。proposal-only 只包含带唯一 `<!-- doco:change mode=proposal-only -->` 标记的 proposal，禁止存在 `work/`；模式不能从缺失文件推断，避免完整包意外丢失 work 后绕过任务检查。archived 对两种来源都只保留 proposal 及其模式标记。
+active/completed 有两种合法形态。完整包包含 `proposal.md`、`work/implement.md` 和 `work/tasks.md`，没有模式标记的既有包均按完整包解释。proposal-only 只包含带唯一 `<!-- doco:change mode=proposal-only -->` 标记的 proposal，禁止存在 `work/`；模式不能从缺失文件推断，避免完整包意外丢失 work 后绕过任务检查。archived 对两种来源都只保留 proposal 及其中的模式与生命周期标记。
 
-`new` 在 `doco/tmp/` 暂存骨架后移动到 active；默认生成完整包，`--proposal-only` 只生成 proposal，二者的模板骨架都故意不能通过 check。`complete` 对完整包检查任务、结果和任务证据，对 proposal-only 检查结果、proposal 验证证据和 blocker，然后移动整个目录；真实验收和当前事实同步仍由用户/Agent 完成。`reopen` 按原模式保留包内容，不擅自重置任务。
+`new` 在 `doco/tmp/` 暂存带 created-at 的骨架后移动到 active；默认生成完整包，`--proposal-only` 只生成 proposal，二者的模板骨架都故意不能通过 check。`complete` 对完整包检查任务、结果和任务证据，对 proposal-only 检查结果、proposal 验证证据和 blocker，然后原子写入 completed-at 并移动整个目录；真实验收和当前事实同步仍由用户/Agent 完成。`reopen` 按原模式和原时间保留包内容，不擅自重置任务；再次 complete 覆盖 completed-at。
 
-`archive` 仅接受 completed，先显示删除范围；`--dry-run` 在预览后停止，普通执行不再要求交互确认。它随后加锁并复核预览快照，保留完整 proposal，只删除完整包 work 内预检过的文件，最后移动到 archived。proposal-only 没有 work 是正常状态；完整包在部分清理后缺少 work 仍可重试完成移动。`--yes` 仅为兼容保留，不改变流程。工作包根目录有其他文件时拒绝归档，要求用户先明确整理。`cancel` 仅接受 active，先将明确的取消原因和已实施代码处理方式写入 proposal 结果，再按相同清理路径归档；不回滚代码。archive 只保留目标和交付摘要，不承担实现历史，后者由 Git、PR 或项目发布记录保存。
+`archive` 仅接受 completed，先显示删除范围和 archived-at 更新；`--dry-run` 在预览后停止，普通执行不再要求交互确认。它随后加锁并复核预览快照，原子写入 archived-at，保留完整 proposal，只删除完整包 work 内预检过的文件，最后移动到 archived。proposal-only 没有 work 是正常状态；完整包在部分清理后缺少 work 仍可重试完成移动。`--yes` 仅为兼容保留，不改变流程。工作包根目录有其他文件时拒绝归档，要求用户先明确整理。`cancel` 仅接受 active，将 archived-at、明确的取消原因和已实施代码处理方式一起写入 proposal，再按相同清理路径归档；不回滚代码。archive 只保留目标、交付摘要和生命周期元数据，不承担实现历史，后者由 Git、PR 或项目发布记录保存。
 
 ## 文件安全与失败恢复
 
@@ -52,7 +54,7 @@ init 和 update 先预检，再加锁并复核读取快照，写入每个文件�
 
 不同 skill 目录、项目文档和导航文件之间**不是跨文件事务**：后续失败时打印已应用项，保留此前已提交的独立组或文件，修复原因后幂等重试。进程强制终止、断电或持续文件系统故障也不承诺物理事务；由于根 skill 最后写入，提交前退出时旧版本会使下次 init 重新刷新整个 bundle。UTF-8（可含 BOM）、LF/CRLF 受到支持；不能安全解码、未闭合结构或歧义导入会报冲突。
 
-归档按预览清单自底向上删除，不沿链接递归。删除失败时保留原状态目录和 proposal，明确报告部分清理；修复文件占用/权限后重试。若 work 已删除但移动失败，同一归档命令允许缺少 work，以完成剩余移动。取消失败后可能已写入取消结果；用相同原因和处理方式重试。进程意外退出不一定来得及打印最终诊断，可用 `list` 和实际目录检查状态。
+complete 在移动前写 completed-at；移动失败时源仍为 active，列表仍使用 created-at，重试会覆盖完成时间。归档在清理前写 archived-at，并按预览清单自底向上删除，不沿链接递归。写入或删除失败时保留原状态目录和 proposal，明确报告已应用范围；修复文件占用/权限后重试。若 work 已删除但移动失败，同一归档命令允许缺少 work，以完成剩余移动并覆盖 archived-at。取消失败后可能已写入归档时间和取消结果；用相同原因和处理方式重试。进程意外退出不一定来得及打印最终诊断，可用 `list` 和实际目录检查状态。
 
 锁协调 doco 进程，不控制外部编辑器。快照和路径复核能拒绝检测到的并发修改，但不构成抵御恶意进程反复替换目录的操作系统沙箱，也不承诺多文件断电事务。不要在迁移或清理时并行修改同一工作包。
 

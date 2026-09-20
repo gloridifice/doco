@@ -10,6 +10,7 @@ pub mod templates;
 pub mod ui;
 pub mod update;
 
+pub(crate) use package::{LifecycleEvent, lifecycle_times, now_utc, set_lifecycle_event};
 pub use package::{PROPOSAL_ONLY_MARKER, PackageMode, package_mode};
 
 use anyhow::{Context, Result, bail};

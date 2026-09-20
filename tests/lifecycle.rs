@@ -15,6 +15,9 @@ fn full_lifecycle_preserves_snapshots_then_only_proposal() {
     let proposal = s.read("doco/changes/active/queue/proposal.md");
     s.ok(&["complete", "queue"]);
     assert!(!s.path("doco/changes/active/queue").exists());
+    let completed_proposal = s.read("doco/changes/completed/queue/proposal.md");
+    assert!(!completed_proposal.contains("completed-at=-"));
+    assert!(completed_proposal.contains("archived-at=-"));
     assert!(
         s.path("doco/changes/completed/queue/work/tasks.md")
             .exists()
@@ -29,7 +32,19 @@ fn full_lifecycle_preserves_snapshots_then_only_proposal() {
     s.ok(&["archive", "queue", "--dry-run"]);
     assert_eq!(s.files(), before);
     s.ok(&["archive", "queue"]);
-    assert_eq!(s.read("doco/changes/archived/queue/proposal.md"), proposal);
+    let archived_proposal = s.read("doco/changes/archived/queue/proposal.md");
+    assert!(!archived_proposal.contains("completed-at=-"));
+    assert!(!archived_proposal.contains("archived-at=-"));
+    let without_lifecycle = |text: &str| {
+        text.lines()
+            .filter(|line| !line.starts_with("<!-- doco:lifecycle "))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    assert_eq!(
+        without_lifecycle(&archived_proposal),
+        without_lifecycle(&proposal)
+    );
     assert_eq!(
         fs::read_dir(s.path("doco/changes/archived/queue"))
             .unwrap()
@@ -50,6 +65,9 @@ fn skeleton_is_not_a_design_and_no_implicit_selection_exists() {
         s.path("doco/changes/active/goal/work/implement.md")
             .exists()
     );
+    let proposal = s.read("doco/changes/active/goal/proposal.md");
+    assert!(proposal.starts_with("<!-- doco:lifecycle v=1 created-at="));
+    assert!(proposal.contains(" completed-at=- archived-at=- -->\n# goal"));
     let tasks = s.read("doco/changes/active/goal/work/tasks.md");
     assert!(tasks.contains("- [ ] 1.1"));
     assert!(tasks.contains("- [ ] 2.1"));
@@ -66,10 +84,9 @@ fn proposal_only_creation_and_lifecycle_never_require_work_files() {
     assert!(output.contains("proposal-only"));
     assert!(s.path("doco/changes/active/small/proposal.md").exists());
     assert!(!s.path("doco/changes/active/small/work").exists());
-    assert!(
-        s.read("doco/changes/active/small/proposal.md")
-            .starts_with("<!-- doco:change mode=proposal-only -->")
-    );
+    let proposal = s.read("doco/changes/active/small/proposal.md");
+    assert!(proposal.starts_with("<!-- doco:change mode=proposal-only -->"));
+    assert!(proposal.contains("\n<!-- doco:lifecycle v=1 created-at="));
     s.err(&["check", "small"], "template markers");
 
     s.write(
@@ -219,9 +236,23 @@ fn reopens_work_package_without_resetting_user_tasks() {
     s.ready("goal");
     let tasks = s.read("doco/changes/active/goal/work/tasks.md");
     s.ok(&["complete", "goal"]);
+    let path = "doco/changes/completed/goal/proposal.md";
+    let proposal = s.read(path);
+    let completed = proposal
+        .split_ascii_whitespace()
+        .find(|field| field.starts_with("completed-at="))
+        .unwrap();
+    s.write(
+        path,
+        &proposal.replace(completed, "completed-at=2000-01-01T00:00:00Z"),
+    );
     s.ok(&["reopen", "goal"]);
     assert_eq!(s.read("doco/changes/active/goal/work/tasks.md"), tasks);
     s.ok(&["complete", "goal"]);
+    assert!(
+        !s.read("doco/changes/completed/goal/proposal.md")
+            .contains("completed-at=2000-01-01T00:00:00Z")
+    );
 }
 #[test]
 fn cancellation_is_explicit_and_does_not_touch_code() {
@@ -255,6 +286,7 @@ fn cancellation_is_explicit_and_does_not_touch_code() {
     let proposal = s.read("doco/changes/archived/goal/proposal.md");
     assert!(proposal.contains("Cancelled."));
     assert!(proposal.contains("Retain independent"));
+    assert!(!proposal.contains("archived-at=-"));
     assert_eq!(s.read("code.rs"), "keep my code");
     assert!(!s.path("doco/changes/completed/goal").exists());
     assert!(!s.path("doco/changes/archived/goal/work").exists());
@@ -277,6 +309,7 @@ fn proposal_only_cancellation_updates_and_archives_the_proposal() {
     let proposal = s.read("doco/changes/archived/small/proposal.md");
     assert!(proposal.contains("Cancelled."));
     assert!(proposal.contains("No code was implemented"));
+    assert!(!proposal.contains("archived-at=-"));
 }
 
 #[test]
