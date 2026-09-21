@@ -62,6 +62,6 @@ complete 在移动前写 completed-at；移动失败时源仍为 active，列表
 
 默认 context 从 architecture、指定 active 工作包及其显式引用输出路径候选；完整包加入 proposal、implement 和 tasks，proposal-only 只加入 proposal。它排除其他变更、tmp 和能识别的被替代 ADR。`--history` 只显式纳入指定历史工作包并标注快照。`doco:<id>` 引用解析当前位置，但不会因此自动把其他变更加入阅读范围。CLI 不约束外部搜索工具，也不自动判断所有语义相关资料。
 
-根入口使用独立 DOCO 标记行及唯一入口模板版本，保留区块外字节。入口明确 doco 变更只用于显式跟踪和设计/协调，不是所有行为或实现细节修改的前置条件；未创建变更也不免除同步受影响当前文档的责任。完整相同模板可幂等识别；任意自然语言改写不能保证去重。Claude 的安全、独立 `@AGENTS.md` / `@./AGENTS.md` 导入表示复用 Most agents；复杂导入或与独立 Claude 入口并存要求人工处理。`.pi/skills/doco`、`.codex/skills/doco` 不再复用，也不会自动移动或删除。
+根入口使用独立 DOCO 标记行及唯一入口模板版本，保留区块外字节。入口明确 doco 变更只用于显式跟踪和设计/协调，不是所有行为或实现细节修改的前置条件；未创建变更也不免除同步受影响当前文档的责任。入口归属只由代码围栏外唯一且有序闭合的 `DOCO:START` / `DOCO:END` 标记界定；块外出现 doco 标题、skill 路径或其他相关自然语言不参与归属或冲突判断。无标记内容始终按用户内容保留，初始化会另行追加受管块；标记缺失、重复、嵌套或顺序错误时要求删除整个 DOCO 块后重试。Claude 的安全、独立 `@AGENTS.md` / `@./AGENTS.md` 导入表示复用 Most agents；复杂导入或与独立 Claude 入口并存要求人工处理。`.pi/skills/doco`、`.codex/skills/doco` 不再复用，也不会自动移动或删除。
 
 仅检查已知项目级发现位置和可见 override/config 提示，不审计用户全局插件、模型设置、权限、可信状态或所有加载开关。不自动登录或调用模型。Agent 的实际技能发现与规则遵循需要在客户端会话中另行验证。

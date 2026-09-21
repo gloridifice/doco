@@ -197,45 +197,56 @@ fn refresh_is_scoped_and_conflicts_preflight_all_files() {
     assert_eq!(s.files(), before);
 }
 #[test]
-fn rejects_malformed_markers_and_custom_workflows_even_on_refresh() {
+fn rejects_malformed_markers_with_removal_guidance_even_on_refresh() {
     for text in [
         "<!-- DOCO:START -->\nOops\n",
         "<!-- DOCO:END -->\n",
         "<!-- DOCO:START -->\n<!-- DOCO:START -->\n<!-- DOCO:END -->\n",
-        "## Doco custom workflow\nRun everything automatically.\n",
     ] {
         let s = Sandbox::new();
         s.write("AGENTS.md", text);
         let before = s.files();
-        s.err(&["init", "--agent", "most", "--refresh"], "CONFLICT");
+        s.err(
+            &["init", "--agent", "most", "--refresh"],
+            "delete the entire DOCO block and retry",
+        );
         assert_eq!(s.files(), before);
         assert!(!s.path("doco").exists());
     }
 }
 #[test]
-fn adopts_unmarked_templates_without_duplication() {
+fn preserves_doco_related_text_outside_the_managed_block() {
+    let s = Sandbox::new();
+    let custom = "## Doco custom workflow\n- Run doco manually.\nRead .agents/skills/doco/SKILL.md when needed.\n";
+    s.write("AGENTS.md", custom);
+    s.init();
+    assert!(s.read("AGENTS.md").starts_with(custom));
+
+    s.write(
+        "AGENTS.md",
+        &s.read("AGENTS.md")
+            .replace("Perform only", "Perform exactly"),
+    );
+    s.ok(&["init", "--agent", "most", "--refresh"]);
+    let result = s.read("AGENTS.md");
+    assert!(result.starts_with(custom));
+    assert!(result.contains("Perform only"));
+}
+#[test]
+fn unmarked_navigation_is_preserved_and_does_not_claim_managed_ownership() {
     let s = Sandbox::new();
     let plain = templates::navigation(".agents/skills/doco");
     s.write("AGENTS.md", &format!("# Before\n\n{plain}\n# After\n"));
-    for (file, generated) in templates::FILES {
-        s.write(
-            &format!(".agents/skills/doco/{file}"),
-            &generated.replace(&format!("{}\n", templates::MARKER), ""),
-        );
-    }
     s.init();
     let result = s.read("AGENTS.md");
     assert_eq!(
         result.matches("For current project documentation").count(),
-        1
+        2
     );
     assert_eq!(result.matches("<!-- DOCO:START -->").count(), 1);
     let before = s.files_without_index();
     s.init();
     assert_eq!(s.files_without_index(), before);
-    let s = Sandbox::new();
-    s.write("AGENTS.md", &format!("{plain}\n{plain}"));
-    s.err(&["init", "--agent", "most"], "multiple unmarked");
 }
 #[test]
 fn fenced_examples_are_not_real_markers_or_imports() {

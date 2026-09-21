@@ -30,7 +30,7 @@ AGE 按目录状态选择 proposal 中持久化的事件时间：active 使用 c
 
 根 `SKILL.md` 以独立的 `v<非负整数>` 标记记录整个 doco skill bundle 的版本，当前版本为 `v3`；references 和模板文件不重复记录该版本。AGENTS/CLAUDE 的 DOCO 块在 START 后以唯一 `<!-- doco:entry template=v1 -->` 记录入口模板版本。已安装版本缺失、格式错误、重复或无法解析时按 `v0` 比较，但版本判断不授予文件归属：没有 doco 受管标记的同名 skill 仍然冲突，入口缺失或边界歧义也不能用 `--refresh` 强行取得归属。
 
-CLI 内置版本严格高于已安装版本时，普通 `init` 或 `update` 无需 `--refresh` 即刷新对应受管内容。相同版本的内容差异仍要求 `--refresh`；更高的已安装版本不会被普通运行降级。显式 `--refresh` 保留覆盖受管内容及强制降级的能力。入口更新只替换 DOCO 块，块外字节保持不变。
+CLI 内置版本严格高于已安装版本时，普通 `init` 或 `update` 无需 `--refresh` 即刷新对应受管内容。相同版本的内容差异仍要求 `--refresh`；更高的已安装版本不会被普通运行降级。显式 `--refresh` 保留覆盖受管内容及强制降级的能力。入口更新只替换 DOCO 块，块外字节保持不变；块外任何 doco 相关自然语言均不参与检测。入口归属只认代码围栏外唯一且按顺序闭合的 `<!-- DOCO:START -->` 与 `<!-- DOCO:END -->`。没有标记时保留原文并追加新受管块，不自动收编无标记模板；标记缺失、重复、嵌套或顺序错误时，即使使用 `--refresh` 也拒绝写入，并提示删除整个 DOCO 块后重试。
 
 `doco update` 不接受 Agent 参数，也不创建集成；它要求项目已初始化，并检测 `.agents`/AGENTS 与 `.claude`/CLAUDE 两个固定组合。完整组合会全部更新；skill 与受管入口只存在一侧、入口引用目录不一致、同名内容不受管、发现旧路径或两个组合都不存在时失败并提示使用 `init` 或人工迁移。只有 `CLAUDE.md` 的 `@AGENTS.md` 导入时，Claude 复用 Most agents，不算独立 Claude 安装；独立 Claude skill 与该导入并存时拒绝。`update --dry-run` 只显示计划，零写入。
 

@@ -17,19 +17,10 @@ pub fn block_range(text: &str) -> Result<Option<Range<usize>>> {
     }
     if markers.len() != 2 || markers[0].1.trim() != START || markers[1].1.trim() != END {
         bail!(
-            "missing, nested or duplicate DOCO markers; manual repair required even with --refresh"
+            "invalid DOCO marker closure (missing, nested, duplicated, or out of order); delete the entire DOCO block and retry"
         );
     }
     Ok(Some(markers[0].0.start..markers[1].0.end))
-}
-fn suspect(text: &str) -> bool {
-    markdown::body_lines(text).iter().any(|(_, line)| {
-        let lower = line.to_lowercase();
-        let trimmed = lower.trim();
-        (trimmed.starts_with('#') && (trimmed.contains("doco") || trimmed.contains("多科")))
-            || (trimmed.contains("skills/doco") || trimmed.contains("doco skill"))
-            || (trimmed.starts_with("- ") && trimmed.contains("doco "))
-    })
 }
 fn generated_block(skill: &str) -> String {
     format!(
@@ -51,37 +42,6 @@ fn parsed_version(block: &str) -> Option<u64> {
         .unwrap()
         .captures(candidate)?;
     captures.get(1)?.as_str().parse().ok()
-}
-
-fn unmarked_range(text: &str, skill: &str) -> Result<Option<Range<usize>>> {
-    let plain = markdown::styled(&templates::navigation(skill), text);
-    let body = markdown::body_lines(text);
-    let matches: Vec<_> = text
-        .match_indices(plain.trim_end_matches(['\r', '\n']))
-        .filter(|(start, matched)| {
-            body.iter().any(|(range, _)| range.start == *start)
-                && text
-                    .as_bytes()
-                    .get(start + matched.len())
-                    .is_none_or(|byte| matches!(byte, b'\r' | b'\n'))
-        })
-        .collect();
-    if matches.len() > 1 {
-        bail!("multiple unmarked doco navigation bodies; manual merge required");
-    }
-    let Some((start, matched)) = matches.first() else {
-        if suspect(text) {
-            bail!("suspected custom doco workflow; preserve original and merge manually");
-        }
-        return Ok(None);
-    };
-    let range = *start..*start + matched.len();
-    let mut outside = text.to_string();
-    outside.replace_range(range.clone(), "");
-    if suspect(&outside) {
-        bail!("additional custom doco workflow; manual merge required");
-    }
-    Ok(Some(range))
 }
 
 pub(crate) fn installed(text: &str, skill: &str) -> Result<bool> {
@@ -108,7 +68,7 @@ pub(crate) fn installed(text: &str, skill: &str) -> Result<bool> {
         }
         return Ok(true);
     }
-    Ok(unmarked_range(text, skill)?.is_some())
+    Ok(false)
 }
 
 pub fn update(existing: Option<&str>, title: &str, skill: &str, refresh: bool) -> Result<String> {
@@ -124,13 +84,6 @@ pub fn update(existing: Option<&str>, title: &str, skill: &str, refresh: bool) -
     };
     markdown::safe_append(text)?;
     if let Some(range) = block_range(text)? {
-        let mut outside = text.to_string();
-        outside.replace_range(range.clone(), "");
-        if suspect(&outside) {
-            bail!(
-                "suspected additional custom doco workflow outside managed block; manual merge required"
-            );
-        }
         if markdown::normalize(&text[range.clone()]).trim_end() == block.trim_end() {
             return Ok(text.to_string());
         }
@@ -144,17 +97,6 @@ pub fn update(existing: Option<&str>, title: &str, skill: &str, refresh: bool) -
         }
         let mut output = text.to_string();
         output.replace_range(range, &markdown::styled(&block, text));
-        return Ok(output);
-    }
-    // Adopt a complete known unmarked body, but never a fenced example.
-    if let Some(range) = unmarked_range(text, skill)? {
-        let nl = markdown::newline(text);
-        let matched = &text[range.clone()];
-        let replacement = format!(
-            "{START}{nl}<!-- doco:entry template=v{ENTRY_VERSION} -->{nl}{matched}{nl}{END}"
-        );
-        let mut output = text.to_string();
-        output.replace_range(range, &replacement);
         return Ok(output);
     }
     let nl = markdown::newline(text);
@@ -193,11 +135,6 @@ pub fn visible_skill(text: &str) -> Result<Option<String>> {
     let text = text.trim_start_matches('\u{feff}');
     markdown::safe_append(text)?;
     let Some(range) = block_range(text)? else {
-        if suspect(text) {
-            bail!(
-                "imported AGENTS.md has custom/unmarked doco instructions; initialize or merge it explicitly first"
-            );
-        }
         return Ok(None);
     };
     for path in [".agents/skills/doco", ".claude/skills/doco"] {
@@ -233,10 +170,10 @@ mod tests {
     }
 
     #[test]
-    fn installed_requires_a_managed_or_complete_known_navigation() {
+    fn installed_requires_a_managed_navigation() {
         let skill = ".agents/skills/doco";
         assert!(installed(&generated_block(skill), skill).unwrap());
-        assert!(installed(&templates::navigation(skill), skill).unwrap());
+        assert!(!installed(&templates::navigation(skill), skill).unwrap());
         assert!(!installed("# Custom instructions\n", skill).unwrap());
     }
 }
