@@ -1,5 +1,7 @@
 use crate::{
-    PackageMode, Project, State, markdown, package_mode, safety,
+    PackageMode, Project, State, markdown,
+    package::work_specs,
+    package_mode, safety,
     ui::{self, Reporter, Tone},
 };
 use anyhow::{Result, bail};
@@ -59,6 +61,7 @@ pub fn context_with_ui(
     if change.state != State::Archived && proposal_mode == PackageMode::Full {
         queue.push_back(change.path.join("work/implement.md"));
         queue.push_back(change.path.join("work/tasks.md"));
+        queue.extend(work_specs(project, &change)?);
     }
     while let Some(path) = queue.pop_front() {
         if paths.contains(&path) {
@@ -150,7 +153,7 @@ pub fn context_with_ui(
     }
     ui::text(
         reporter,
-        "BOUNDARY: read only relevant current specs, effective decisions, affected source/tests and the selected active package. Explicit references are candidates; the agent must verify relevance.\nEXCLUDE by default: unrelated active changes, completed/archived packages, superseded ADRs and doco/tmp/. --history includes only the selected historical package. External search tools are not constrained by this CLI.\n",
+        "BOUNDARY: read only relevant current specs, effective decisions, affected source/tests and the selected active package. Work specs describe this change's target contracts, not current facts. Explicit references are candidates; the agent must verify relevance.\nEXCLUDE by default: unrelated active changes, completed/archived packages, superseded ADRs and doco/tmp/. --history includes only the selected historical package. External search tools are not constrained by this CLI.\n",
     )?;
     Ok(())
 }

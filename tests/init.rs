@@ -67,7 +67,7 @@ fn skill_version_is_stored_only_in_the_root_skill() {
     s.init();
     assert!(
         s.read(".agents/skills/doco/SKILL.md")
-            .contains("<!-- doco:skill version=v3 -->")
+            .contains("<!-- doco:skill version=v4 -->")
     );
     for (file, _) in templates::FILES {
         if *file != "SKILL.md" {
@@ -87,7 +87,7 @@ fn old_managed_skill_is_upgraded_as_a_bundle_without_refresh() {
     let skill = ".agents/skills/doco/SKILL.md";
     s.write(
         skill,
-        &s.read(skill).replace("<!-- doco:skill version=v3 -->", ""),
+        &s.read(skill).replace("<!-- doco:skill version=v4 -->", ""),
     );
     let reference = ".agents/skills/doco/references/create.md";
     s.write(
@@ -117,11 +117,11 @@ fn newer_installed_skill_is_not_automatically_downgraded() {
     let s = Sandbox::new();
     s.init();
     let skill = ".agents/skills/doco/SKILL.md";
-    s.write(skill, &s.read(skill).replace("version=v3", "version=v4"));
+    s.write(skill, &s.read(skill).replace("version=v4", "version=v5"));
     s.err(&["init", "--agent", "most"], "managed file differs");
-    assert!(s.read(skill).contains("version=v4"));
+    assert!(s.read(skill).contains("version=v5"));
     s.ok(&["init", "--agent", "most", "--refresh"]);
-    assert!(s.read(skill).contains("version=v3"));
+    assert!(s.read(skill).contains("version=v4"));
 }
 
 #[test]

@@ -1,9 +1,12 @@
 pub mod tasks;
 use crate::{
-    Change, PackageMode, Project, State, lifecycle_times, markdown, package_mode, safety,
+    Change, PackageMode, Project, State, lifecycle_times, markdown,
+    package::work_specs,
+    package_mode, safety,
     ui::{self, Reporter, Tone},
 };
 use anyhow::{Result, bail};
+use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 
 #[derive(Default)]
 pub struct Report {
@@ -111,6 +114,22 @@ fn links(project: &Project, change: &Change, name: &str, text: &str, report: &mu
             }
         }
     }
+}
+
+// A heading, whitespace or hidden comment alone is not a specification body.
+fn spec_has_body(text: &str) -> bool {
+    let mut in_heading = false;
+    for event in Parser::new(text.trim_start_matches('\u{feff}')) {
+        match event {
+            Event::Start(Tag::Heading { .. }) => in_heading = true,
+            Event::End(TagEnd::Heading(_)) => in_heading = false,
+            Event::Text(text) | Event::Code(text) if !in_heading && !text.trim().is_empty() => {
+                return true;
+            }
+            _ => {}
+        }
+    }
+    false
 }
 
 fn add_blockers(report: &mut Report, blockers: Vec<String>, strict: bool) {
@@ -228,5 +247,31 @@ pub fn inspect(project: &Project, change: &Change, completing: bool) -> Result<R
         &mut report,
     );
     links(project, change, "work/tasks.md", &tasks_text, &mut report);
+    for path in work_specs(project, change)? {
+        let name = path
+            .strip_prefix(&change.path)?
+            .to_string_lossy()
+            .replace('\\', "/");
+        let text = safety::text(project.root(), &path)?;
+        if !spec_has_body(&text) {
+            report
+                .errors
+                .push(format!("{name}: empty specification body"));
+        }
+        if placeholders(&text) {
+            report
+                .errors
+                .push(format!("{name}: unresolved template markers"));
+        }
+        links(project, change, &name, &text, &mut report);
+        add_blockers(
+            &mut report,
+            tasks::blockers(&text)
+                .into_iter()
+                .map(|blocker| format!("{name}: {blocker}"))
+                .collect(),
+            strict,
+        );
+    }
     Ok(report)
 }

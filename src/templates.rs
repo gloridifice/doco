@@ -33,6 +33,10 @@ pub const FILES: &[(&str, &str)] = &[
         "templates/tasks.md",
         include_str!("../assets/skill/templates/tasks.md"),
     ),
+    (
+        "templates/spec.md",
+        include_str!("../assets/skill/templates/spec.md"),
+    ),
 ];
 pub fn change_file(name: &str, id: &str) -> String {
     // Templates are embedded verbatim via `include_str!`, so their newline style

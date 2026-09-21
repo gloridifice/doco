@@ -22,13 +22,17 @@ AGE 按目录状态选择 proposal 中持久化的事件时间：active 使用 c
 
 `doco new <id>` 默认创建 proposal、实现设计和任务列表的完整骨架。`doco new <id> --proposal-only` 只创建带显式模式标记的 `proposal.md`，不创建 `work/`；它适用于范围、预期行为和验收都能在 proposal 中完整表达，且不需要独立设计选择或依赖任务拆分的受跟踪变更。两种模式都会在 proposal 中写入 created-at；CLI 不按行数、文件数或风险自动判断变更规模。
 
+完整包支持可选 `work/specs/**/*.md` 目标规格，目录和文件由用户/Agent 按需创建；`new` 不预建空目录、占位规格，也没有新增规格参数。skill 提供 `templates/spec.md`，用于复杂行为、接口或兼容性变更。proposal-only 仍禁止 work，需要独立规格时应先转换为完整包。
+
+`context` 自动把所选完整包中的工作规格加入路径候选，排序、去重并继续跟随显式引用；completed 需要 `--history` 并使用快照标识。工作规格不是当前有效契约，未引用的其他 work 材料和其他变更不自动进入范围。`check` 对存在的规格检查正文、模板残留、引用及显式阻塞，阻塞在 active 普通检查中警告，在 complete/completed 检查中报错；缺失或空规格目录不警告。详细规则见[文档格式](document-format.md)。
+
 仅 proposal 模式是持久格式选择，不表示所有小型代码修改都必须创建变更。doco 归档不保存实现历史；普通行为修复和实现细节修改可以直接进行，Git、PR 或项目发布记录负责实现历史。无论是否创建变更，已记录的当前架构或规范事实发生变化时仍需同步当前文档。
 
 ## 初始化与集成更新
 
 `init --agent` 只有两个正式值：`most` 将 skill 安装到 `.agents/skills/doco` 并在 `AGENTS.md` 写受管入口，`claude` 将 skill 安装到 `.claude/skills/doco` 并在 `CLAUDE.md` 写受管入口；两项可组合且重复项会去重。旧 `codex`、`pi` 参数不再接受，`.pi/skills/doco` 和 `.codex/skills/doco` 也不再是安装目标；选择 Most agents 时发现这些旧版或替代路径会要求先人工迁移。
 
-根 `SKILL.md` 以独立的 `v<非负整数>` 标记记录整个 doco skill bundle 的版本，当前版本为 `v3`；references 和模板文件不重复记录该版本。AGENTS/CLAUDE 的 DOCO 块在 START 后以唯一 `<!-- doco:entry template=v1 -->` 记录入口模板版本。已安装版本缺失、格式错误、重复或无法解析时按 `v0` 比较，但版本判断不授予文件归属：没有 doco 受管标记的同名 skill 仍然冲突，入口缺失或边界歧义也不能用 `--refresh` 强行取得归属。
+根 `SKILL.md` 以独立的 `v<非负整数>` 标记记录整个 doco skill bundle 的版本，当前版本为 `v4`；references 和模板文件不重复记录该版本。AGENTS/CLAUDE 的 DOCO 块在 START 后以唯一 `<!-- doco:entry template=v1 -->` 记录入口模板版本。已安装版本缺失、格式错误、重复或无法解析时按 `v0` 比较，但版本判断不授予文件归属：没有 doco 受管标记的同名 skill 仍然冲突，入口缺失或边界歧义也不能用 `--refresh` 强行取得归属。
 
 CLI 内置版本严格高于已安装版本时，普通 `init` 或 `update` 无需 `--refresh` 即刷新对应受管内容。相同版本的内容差异仍要求 `--refresh`；更高的已安装版本不会被普通运行降级。显式 `--refresh` 保留覆盖受管内容及强制降级的能力。入口更新只替换 DOCO 块，块外字节保持不变；块外任何 doco 相关自然语言均不参与检测。入口归属只认代码围栏外唯一且按顺序闭合的 `<!-- DOCO:START -->` 与 `<!-- DOCO:END -->`。没有标记时保留原文并追加新受管块，不自动收编无标记模板；标记缺失、重复、嵌套或顺序错误时，即使使用 `--refresh` 也拒绝写入，并提示删除整个 DOCO 块后重试。
 
@@ -63,6 +67,6 @@ CLI 内置版本严格高于已安装版本时，普通 `init` 或 `update` 无�
 
 非 dry-run 在预览成功后不再询问破坏性确认，而是获取项目写锁、重新解析状态并复核工作包快照，先将 archived-at 原子写入 proposal，再按既有恢复规则删除和移动。`cancel` 同时写入取消结果和 archived-at。`--yes` 为旧脚本保留，但不改变执行行为。选择命令本身即授权执行；需要人工检查范围时应先单独运行 `--dry-run`。
 
-仅 proposal 变更不存在 work 是正常状态，预览显示说明而非 `RECOVERY`；完整变更若已在先前失败中删除 work，仍显示 `RECOVERY` 并允许完成剩余移动。模式标记与 work 同时存在时拒绝归档。
+仅 proposal 变更不存在 work 是正常状态，预览显示说明而非 `RECOVERY`；完整变更若已在先前失败中删除 work，仍显示 `RECOVERY` 并允许完成剩余移动。模式标记与 work 同时存在时拒绝归档。完整包的工作规格与其他 work 材料一样出现在删除预览中，归档或取消后不保留；保留文档指向这些规格的引用仍会阻止归档。
 
 删除仍不递归跟随链接。部分清理或移动失败时，按输出的 APPLIED / DELETED 路径和错误说明修复后重试；此时缓存已被撤销，重试会重新扫描目录。命令不承诺代码回滚、Git 操作或跨文件事务。时间写入后发生清理或移动失败时，源状态保持不变，重试会覆盖目标事件时间；list 始终按实际目录状态选择字段。archive 最终只保留含生命周期时间的 proposal，不是实现历史存储。

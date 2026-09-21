@@ -1,6 +1,6 @@
-use crate::markdown;
+use crate::{Change, Project, markdown, safety};
 use anyhow::{Context, Result, bail};
-use std::{ops::Range, time::SystemTime};
+use std::{ops::Range, path::PathBuf, time::SystemTime};
 use time::{OffsetDateTime, UtcOffset, format_description::well_known::Rfc3339};
 
 pub const PROPOSAL_ONLY_MARKER: &str = "<!-- doco:change mode=proposal-only -->";
@@ -24,6 +24,26 @@ pub fn package_mode(proposal: &str) -> Result<PackageMode> {
         [marker] => bail!("proposal.md: unsupported change mode marker: {marker}"),
         _ => bail!("proposal.md: expected at most one doco change mode marker"),
     }
+}
+
+/// Discover optional target specs in a selected full package, never in other work material.
+/// Callers select the package mode/state; all descendants are checked before filtering.
+pub(crate) fn work_specs(project: &Project, change: &Change) -> Result<Vec<PathBuf>> {
+    let directory = change.path.join("work/specs");
+    safety::inspect(project.root(), &directory)?;
+    if !directory.try_exists()? {
+        return Ok(Vec::new());
+    }
+    if !directory.is_dir() {
+        bail!("work/specs must be a directory: {}", directory.display());
+    }
+    let mut paths: Vec<_> = safety::tree(project.root(), &directory)?
+        .into_iter()
+        .filter(|entry| !entry.directory && entry.path.extension().is_some_and(|e| e == "md"))
+        .map(|entry| entry.path)
+        .collect();
+    paths.sort();
+    Ok(paths)
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

@@ -2,7 +2,7 @@
 
 active/completed 支持两种合法形态：
 
-- 完整变更包含 `proposal.md`、`work/implement.md`、`work/tasks.md`。没有模式标记的既有变更均按完整变更解释；缺少 work 不能自动降级。
+- 完整变更包含 `proposal.md`、`work/implement.md`、`work/tasks.md`，可按需添加 `work/specs/` 目标规格。没有模式标记的既有变更均按完整变更解释；缺少 work 不能自动降级。
 - 仅 proposal 变更只包含 `proposal.md`，且 proposal 中必须有唯一的 `<!-- doco:change mode=proposal-only -->` 标记，`work/` 不得存在。未知或重复的 `doco:change mode=` 标记是格式错误。
 
 archived 始终只保留 proposal，并保留其模式标记和生命周期时间。标题与正文内容可使用项目约定语言；以下是检查器识别的章节名，不支持任意同义改写。
@@ -48,6 +48,23 @@ active 的结果可以是 `Pending — not completed.`；完成与普通归档�
 
 这是机械识别约定，不是设计完整性的证明。小变更可以每节只写简短的明确决定；不适用的算法/文档影响要明确说明，而不是保留空模板。
 
+## 可选工作规格
+
+完整变更可以在 `work/specs/` 下按能力创建规格，使用小写 `.md` 扩展名，支持子目录。目录和文件都可选；`new` 不生成它们，也不要求空目录或占位文件。存在的 `work/specs` 必须是目录；目录缺失或为空不警告。仅 proposal 模式仍禁止整个 `work/`。
+
+工作规格描述本次变更的目标行为、接口、边界、错误、兼容性与验收场景，不是 `doco/specs/` 中的当前有效契约。模板章节是写作建议，不要求固定标题、front matter、规格 ID、任务复选框或每份规格独立的 Verification 字段。implement 负责实现方案，tasks 引用规格场景并记录实际验证，避免多处复制同一要求。
+
+check 和 complete 自动递归检查所选完整包内全部 `work/specs/**/*.md`，即使它们没有被其他文件引用：
+
+- UTF-8（可含 BOM）、LF/CRLF 受支持；路径和所有目录后代复用既有安全检查，拒绝链接、硬链接和特殊文件。
+- 每份规格必须有非空 Markdown 正文；仅空白、标题或 HTML 注释不算正文。正文检查只确认标题外存在文本或代码，不证明规格完整。
+- 无 `TODO`、`TBD`、`{{...}}` 等既有模板残留；模板检查也覆盖示例和注释。
+- 链接复用既有规则：非法稳定引用、项目外引用是错误，缺失普通本地引用是警告。
+- `Blocked:` / `Blocker:` / `阻塞：` / `阻塞原因：` / `Open questions:` / `未决问题：` 复用任务的阻塞规则；active 普通 check 警告，complete 和 completed 快照检查报错。代码示例与注释不作为阻塞字段。
+- 非小写 `.md` 文件不自动视为规格，但仍属于 work 材料，受路径安全检查和归档清理约束。
+
+没有 specs 的既有包无需迁移；原本自行使用该目录的文件现在会参与以上检查。complete/reopen 保留规格原文；完成前由用户/Agent 将已实现且批准的长期契约合并到当前文档，不自动复制整个工作规格。archive/cancel 删除工作规格；proposal 和其他保留文档不得依赖这些文件。CLI 不验证语义验收或测试真实性。
+
 ## 任务
 
 以下任务格式只适用于完整变更；仅 proposal 变更不使用任务复选框。
@@ -74,6 +91,6 @@ active 的结果可以是 `Pending — not completed.`；完成与普通归档�
 
 工作包使用相对 Markdown 链接；稳定跨变更引用可用 `[历史目标](doco:change-id)`。context 解析其状态和位置，但不会自动读取其他变更。
 
-context 跟随显式 Markdown 链接与形似路径的行内代码，从当前架构和所选工作包找候选资料。ADR 文首可用 `Status: Superseded`、`Superseded by:`、`已被 ADR-0002 替代` 或 `状态：已替代` 标注旧决策；其他表述需要 Agent 判断，不能假设工具全部识别。
+context 自动发现所选完整包内的 `work/specs/**/*.md`，排序并去重，不要求先从 implement/tasks 链接。它继续跟随显式 Markdown 链接与形似路径的行内代码，从当前架构和所选工作包找候选资料；不自动纳入其他 work 材料或其他变更的规格。completed 规格只有显式 `--history` 才进入阅读范围，并标注为快照。ADR 文首可用 `Status: Superseded`、`Superseded by:`、`已被 ADR-0002 替代` 或 `状态：已替代` 标注旧决策；其他表述需要 Agent 判断，不能假设工具全部识别。
 
 归档检查 doco 下保留的 Markdown 文件，拒绝其中可识别的 Markdown 链接、HTML href/src 和行内路径指向本次将删除的 work（含 URL 百分号编码路径）。不会分析任意自然语言、动态脚本、所有 HTML 编码或仓库外引用；proposal 独立可读仍需人工确认。找不到的普通源码引用可能是计划新增文件，check 仅警告，不能当作已实现证据。

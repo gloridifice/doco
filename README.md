@@ -19,9 +19,10 @@ You: ok, create doco change
 AI:  doco new optimize-cli-commands
     - proposal.md
     - work/
-      - desgin.md
       - implement.md
       - tasks.md
+      - specs/          # Optional target contracts, authored as needed
+        - cache.md
 > Switch to cheaper model
 You:  Start to implement
 ```
@@ -61,6 +62,10 @@ doco archive bounded-event-queue
 ```
 
 `doco new` creates only a package skeleton. The default full package requires a proposal, implementation plan, and task list. `--proposal-only` creates just a marked `proposal.md` for a tracked change whose behavior and acceptance need no separate design or dependent task breakdown.
+
+For more complex full changes, add optional `work/specs/<capability>.md` target contracts using the installed skill's `templates/spec.md`. Subdirectories are supported. Describe requirements and acceptance scenarios there, and link them from implementation plans and tasks instead of duplicating them. `new` does not create the directory or placeholder specs; small changes need neither.
+
+`context` automatically discovers these specs, and `check` validates nonempty bodies, template residue, references and explicit blockers. Work specs describe intended changes, not current project facts: merge delivered contracts into `doco/specs/` before completion. Complete/reopen preserve work specs; archive/cancel delete them with the rest of `work/`. Proposal-only changes still cannot contain `work/`.
 
 A doco change is optional for implementation and is not an implementation-history log: archive retains only the proposal. Routine behavior fixes and implementation-detail edits may proceed without one unless tracking is explicitly requested. Use Git, pull requests, or release notes for implementation history, and still update current architecture/specs whenever their documented facts or contracts change.
 

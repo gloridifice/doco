@@ -93,6 +93,38 @@ fn archive_never_traverses_external_work_link() {
     assert_eq!(outside.read("keep.md"), "external evidence");
     assert!(s.path("doco/changes/completed/goal/proposal.md").exists());
 }
+#[test]
+fn spec_discovery_rejects_linked_directories_and_nested_files() {
+    for relative in ["work/specs", "work/specs/nested"] {
+        let s = Sandbox::new();
+        s.init();
+        s.ready("goal");
+        let outside = Sandbox::new();
+        outside.write("api.md", "External contract\n");
+        let path = s.path(&format!("doco/changes/active/goal/{relative}"));
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        link_dir(outside.dir.path(), &path);
+        for command in ["context", "check", "complete"] {
+            s.err(&[command, "goal"], "refusing");
+        }
+        assert_eq!(outside.read("api.md"), "External contract\n");
+        assert!(!s.path("doco/changes/completed/goal").exists());
+    }
+
+    let s = Sandbox::new();
+    s.init();
+    s.ready("goal");
+    let outside = Sandbox::new();
+    outside.write("api.md", "External contract\n");
+    let path = s.path("doco/changes/active/goal/work/specs/nested/api.md");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::hard_link(outside.path("api.md"), &path).unwrap();
+    for command in ["context", "check", "complete"] {
+        s.err(&[command, "goal"], "hard-linked");
+    }
+    assert_eq!(outside.read("api.md"), "External contract\n");
+}
+
 #[cfg(windows)]
 #[test]
 fn partial_delete_reports_source_and_retry_finishes() {

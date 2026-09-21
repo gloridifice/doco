@@ -23,7 +23,7 @@ fn updates_all_installed_integrations_and_is_idempotent() {
         let skill = format!("{directory}/SKILL.md");
         s.write(
             &skill,
-            &s.read(&skill).replace("<!-- doco:skill version=v3 -->", ""),
+            &s.read(&skill).replace("<!-- doco:skill version=v4 -->", ""),
         );
         let reference = format!("{directory}/references/create.md");
         s.write(
@@ -58,6 +58,41 @@ fn updates_all_installed_integrations_and_is_idempotent() {
     let output = s.ok(&["update"]);
     assert!(!output.contains("APPLIED "), "{output}");
     assert_eq!(s.files(), before);
+}
+
+#[test]
+fn v3_bundle_upgrade_installs_optional_spec_template_without_refresh() {
+    for command in [
+        vec!["init", "--agent", "most", "--agent", "claude"],
+        vec!["update"],
+    ] {
+        let s = Sandbox::new();
+        s.ok(&["init", "--agent", "most", "--agent", "claude"]);
+        for directory in [".agents/skills/doco", ".claude/skills/doco"] {
+            let skill = format!("{directory}/SKILL.md");
+            s.write(&skill, &s.read(&skill).replace("version=v4", "version=v3"));
+            fs::remove_file(s.path(&format!("{directory}/templates/spec.md"))).unwrap();
+            s.write(
+                &format!("{directory}/references/create.md"),
+                &format!("{}\nOld workflow\n", templates::MARKER),
+            );
+        }
+        let before = s.files();
+        let mut preview = command.clone();
+        preview.push("--dry-run");
+        s.ok(&preview);
+        assert_eq!(s.files(), before);
+        s.ok(&command);
+        for directory in [".agents/skills/doco", ".claude/skills/doco"] {
+            for (file, content) in templates::FILES {
+                assert_eq!(s.read(&format!("{directory}/{file}")), *content);
+            }
+            assert!(s.path(&format!("{directory}/templates/spec.md")).exists());
+        }
+        let before = s.files_without_index();
+        s.ok(&command);
+        assert_eq!(s.files_without_index(), before);
+    }
 }
 
 #[test]
