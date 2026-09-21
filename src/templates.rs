@@ -35,11 +35,21 @@ pub const FILES: &[(&str, &str)] = &[
     ),
 ];
 pub fn change_file(name: &str, id: &str) -> String {
-    FILES
-        .iter()
-        .find(|(path, _)| *path == format!("templates/{name}"))
-        .expect("built-in template exists")
-        .1
+    // Templates are embedded verbatim via `include_str!`, so their newline style
+    // reflects whatever bytes happened to be on disk at build time (e.g. a
+    // Windows checkout with core.autocrlf can materialize CRLF), not a
+    // deliberate choice. Normalize to LF before the exact-byte marker strip
+    // below, otherwise a CRLF source leaves the marker unmatched and it leaks
+    // into generated user files; normalizing also makes freshly generated
+    // content deterministic instead of inheriting an incidental encoding.
+    let normalized = crate::markdown::normalize(
+        FILES
+            .iter()
+            .find(|(path, _)| *path == format!("templates/{name}"))
+            .expect("built-in template exists")
+            .1,
+    );
+    normalized
         .replace(&format!("{MARKER}\n"), "")
         .replace("{{id}}", id)
 }
