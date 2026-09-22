@@ -1,13 +1,17 @@
 [package]
-name = "doco"
+name = "doco-cli"
 version = "0.1.2"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/gloridifice/doco"
 homepage = "https://github.com/gloridifice/doco"
 
-description = "File-backed change management for coding agents"
+description = "Project document managerment and file-backed change management for coding agents."
 rust-version = "1.85"
+
+[[bin]]
+name = "doco"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1"

@@ -147,7 +147,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "doco"
+name = "doco-cli"
 version = "0.1.2"
 dependencies = [
  "anyhow",
