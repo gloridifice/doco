@@ -2,7 +2,7 @@
 name = "doco"
 version = "0.1.0"
 edition = "2024"
-license = "MIT or Apache License 2.0"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/gloridifice/doco"
 homepage = "https://github.com/gloridifice/doco"
 
