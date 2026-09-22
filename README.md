@@ -1,15 +1,29 @@
 # doco
 
-`doco` is a file-backed Rust CLI for managing current project documentation and one-off change packages for coding agents. It does not run models or commit, release, or roll back code.
+`doco` is a file-backed Rust CLI for managing current project documentation and one-off change packages for coding agents. Inspired by [OpenSpec](https://github.com/Fission-AI/openspec) from Fission-AI.
 
 ## Install
 
-Download a prebuilt archive from [GitHub Releases](https://github.com/gloridifice/doco/releases) for Linux x64 (glibc), Windows x64, or macOS Intel/Apple Silicon. Extract it and put `doco` (`doco.exe` on Windows) on your `PATH`. Each release includes `SHA256SUMS` for verifying the archives.
+```
+cargo install doco-cli
+```
 
-Building from source requires Rust 1.85 or later.
+Or clone this project and building from source requires Rust 1.85 or later.
 
 ```sh
 cargo install --path . --locked
+```
+
+## Update
+
+```
+cargo install doco-cli
+```
+
+Then update your workspace's skill.
+
+```
+doco update
 ```
 
 ## See it in action
