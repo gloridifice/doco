@@ -4,7 +4,9 @@
 
 ## Install
 
-Requires Rust 1.85 or later.
+Download a prebuilt archive from [GitHub Releases](https://github.com/gloridifice/doco/releases) for Linux x64 (glibc), Windows x64, or macOS Intel/Apple Silicon. Extract it and put `doco` (`doco.exe` on Windows) on your `PATH`. Each release includes `SHA256SUMS` for verifying the archives.
+
+Building from source requires Rust 1.85 or later.
 
 ```sh
 cargo install --path . --locked
@@ -86,6 +88,17 @@ cargo build --release --locked
 # Explicit scale check for the local change index cache; ignored by default.
 cargo test --release --test scale -- --ignored --nocapture
 ```
+
+### Releases
+
+Set `[package].version` in `Cargo.toml`, refresh `Cargo.lock` with `cargo check`, and commit both before pushing a matching tag, for example:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+[Release CI](.github/workflows/release.yml) accepts stable `vX.Y.Z` tags only and rejects versions that differ from `Cargo.toml`. It runs formatting, Clippy, tests, and release builds for all four targets before publishing a GitHub Release with generated notes, binary archives, and SHA-256 checksums. Windows archives use `.zip`; Linux and macOS use `.tar.gz`. Each archive contains the executable and this README. The workflow does not publish to crates.io.
 
 ### Command performance
 

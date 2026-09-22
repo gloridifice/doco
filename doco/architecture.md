@@ -65,3 +65,9 @@ complete 在移动前写 completed-at；移动失败时源仍为 active，列表
 根入口使用独立 DOCO 标记行及唯一入口模板版本，保留区块外字节。入口明确 doco 变更只用于显式跟踪和设计/协调，不是所有行为或实现细节修改的前置条件；未创建变更也不免除同步受影响当前文档的责任。入口归属只由代码围栏外唯一且有序闭合的 `DOCO:START` / `DOCO:END` 标记界定；块外出现 doco 标题、skill 路径或其他相关自然语言不参与归属或冲突判断。无标记内容始终按用户内容保留，初始化会另行追加受管块；标记缺失、重复、嵌套或顺序错误时要求删除整个 DOCO 块后重试。Claude 的安全、独立 `@AGENTS.md` / `@./AGENTS.md` 导入表示复用 Most agents；复杂导入或与独立 Claude 入口并存要求人工处理。`.pi/skills/doco`、`.codex/skills/doco` 不再复用，也不会自动移动或删除。
 
 仅检查已知项目级发现位置和可见 override/config 提示，不审计用户全局插件、模型设置、权限、可信状态或所有加载开关。不自动登录或调用模型。Agent 的实际技能发现与规则遵循需要在客户端会话中另行验证。
+
+## 构建与发布
+
+`.github/workflows/ci.yml` 在 push 和 pull request 上执行常规 Rust 检查。`.github/workflows/release.yml` 独立处理稳定版本 `vX.Y.Z` 标签推送，先验证标签与 `Cargo.toml` 的包版本一致，再用 stable 工具链分别执行格式、Clippy、测试、release 构建和二进制版本检查；Cargo 检查、测试和构建均使用 `--locked`，锁文件不一致时拒绝发布。
+
+发布目标为 Linux x64 GNU（Ubuntu 22.04 构建）、Windows x64 MSVC、macOS Intel 和 Apple Silicon。每个平台将可执行文件与 README 打包为 `doco-<tag>-<target>` 压缩包，Windows 使用 zip，其他平台使用 tar.gz。所有目标成功后，独立发布 job 才获得 `contents: write` 权限，生成统一 `SHA256SUMS` 并创建附带自动发布说明和全部产物的 GitHub Release；不发布到 crates.io，不自动修改包版本、创建标签或提交代码。
