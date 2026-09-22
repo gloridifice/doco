@@ -45,7 +45,7 @@ fn updates_all_installed_integrations_and_is_idempotent() {
         (".agents/skills/doco", "AGENTS.md"),
         (".claude/skills/doco", "CLAUDE.md"),
     ] {
-        for (file, content) in templates::FILES {
+        for (file, content) in templates::FILES.iter() {
             assert_eq!(s.read(&format!("{directory}/{file}")), *content);
         }
         let entry = s.read(entry);
@@ -84,7 +84,7 @@ fn v3_bundle_upgrade_installs_optional_spec_template_without_refresh() {
         assert_eq!(s.files(), before);
         s.ok(&command);
         for directory in [".agents/skills/doco", ".claude/skills/doco"] {
-            for (file, content) in templates::FILES {
+            for (file, content) in templates::FILES.iter() {
                 assert_eq!(s.read(&format!("{directory}/{file}")), *content);
             }
             assert!(s.path(&format!("{directory}/templates/spec.md")).exists());
@@ -196,7 +196,7 @@ fn claude_import_reuses_most_and_is_not_a_dedicated_install() {
     assert_eq!(s.read("CLAUDE.md"), before);
     assert!(!s.path(".claude/skills/doco").exists());
 
-    for (file, content) in templates::FILES {
+    for (file, content) in templates::FILES.iter() {
         s.write(&format!(".claude/skills/doco/{file}"), content);
     }
     let before = s.files();

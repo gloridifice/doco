@@ -5,7 +5,7 @@ use doco::templates;
 #[test]
 fn skill_bom_is_preserved_during_idempotent_install_and_refresh() {
     let s = Sandbox::new();
-    for (file, content) in templates::FILES {
+    for (file, content) in templates::FILES.iter() {
         let crlf = content.replace("\r\n", "\n").replace('\n', "\r\n");
         s.write(
             &format!(".agents/skills/doco/{file}"),
@@ -100,7 +100,7 @@ fn html_work_links_block_archive() {
 #[test]
 fn most_agents_does_not_silently_adopt_a_legacy_pi_installation() {
     let s = Sandbox::new();
-    for (file, content) in templates::FILES {
+    for (file, content) in templates::FILES.iter() {
         s.write(&format!(".pi/skills/doco/{file}"), content);
     }
     let before = s.files();

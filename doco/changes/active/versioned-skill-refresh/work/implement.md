@@ -8,6 +8,8 @@
 
 Pi-only 初始化还会以全 bundle 内容完全相等作为兼容目录的复用条件。相关集成测试位于 [init 测试](../../../../../tests/init.rs)、[边界测试](../../../../../tests/edge_cases.rs) 和 [安全测试](../../../../../tests/safety.rs)。本工作包之外没有与这些入口相关的未提交实现修改。
 
+执行中发现一个与 bundle 更新直接相关的跨平台缺陷：`templates::FILES` 通过 `include_str!` 直接暴露检出字节，Windows `core.autocrlf` 检出会内嵌 CRLF，而升级路径按目标文件换行风格输出 LF，安装内容因此随构建平台漂移；`tests/update.rs` 的 v3 bundle 升级用例在 `windows-latest` 上因同一文件 LF/CRLF 不等而失败。修复按既有“支持 LF/CRLF”约束把内嵌 bundle 规范化为 LF，不改变已有文件的换行保留策略。
+
 目标是以根 `SKILL.md` 作为唯一版本源和最后提交标记，在保留既有归属检查、预检、锁与并发保护的同时，为每个 skill bundle 增加可回滚的有序更新。
 
 ## 2. Overall approach
@@ -22,6 +24,8 @@ Pi-only 初始化还会以全 bundle 内容完全相等作为兼容目录的复�
 其他内置文件继续只带原来的 `template=v1` 受管标记。CLI 从编译进二进制的根 `SKILL.md` 解析当前版本，不在其他资源文件中复制版本值，也不从 crate semver 推导。
 
 `init::skill` 先读取目标根 `SKILL.md`，分别判断 doco 归属和已安装版本。目标不存在时走新安装；目标已受管且 `bundled_version > installed_version` 时开启 bundle 自动刷新；同版本或更高版本沿用现有内容差异规则。自动刷新一旦开启，就针对整个已知 bundle 使用新版内容，而不是试图从其他文件推断各自版本。
+
+内置 bundle 内容以 LF 为规范形式：保留 `include_str!` 原始清单，公开的 `templates::FILES` 在首次访问时统一规范化为 LF。新安装和模板生成不再继承构建检出编码；更新已有文件仍按目标文件换行风格输出，LF/CRLF 支持不变。
 
 初始化计划增加“可回滚文件组”概念。每个选中的 skill 安装目录形成一个组，文件顺序固定为：
 
@@ -138,6 +142,7 @@ Pi-only 复用检查改为调用同一 bundle 规划规则的只读分类：
 - 版本只写在根 `SKILL.md`，使用独立行 `<!-- doco:skill version=v1 -->`；其他 bundle 文件不复制版本。
 - 当前 bundle 版本为 `v1`，唯一真源是编译内置的根 skill；版本与 crate semver 无关。
 - 缺失或不可识别的已安装版本按 `v0`；版本回退不授予文件覆盖归属。
+- 内置 bundle 以 LF 为规范形式；新文件和模板生成使用该形式，更新已有文件继续沿用目标文件换行。
 - 旧版本触发整个已知 bundle 刷新，其他文件先写，根 `SKILL.md` 最后写。
 - 新安装、自动升级和显式刷新都使用可回滚文件组；普通写入失败时必须补偿已完成步骤。
 - 同版本差异继续要求 `--refresh`；高版本不自动降级；显式 `--refresh` 仍可覆盖受管文件并强制降级。
@@ -161,6 +166,6 @@ Pi-only 复用检查改为调用同一 bundle 规划规则的只读分类：
 - 同版本人工修改在预检阶段零写入冲突；显式刷新走同一回滚组；高版本普通初始化不降级。
 - 新安装失败不会留下半个 bundle；成功安装仍保证导航文件写入前 skill 已完整提交。
 - Pi-only 旧版目录被复用并事务性升级，无关或不可安全升级的替代 skill 继续冲突。
-- BOM、CRLF、dry-run、幂等性、Claude/Codex/Pi 选择、链接/硬链接和并发复核测试无回归。
+- BOM、CRLF、dry-run、幂等性、Claude/Codex/Pi 选择、链接/硬链接和并发复核测试无回归；CRLF 检出（等同 `windows-latest` CI）下所有 bundle 字节比较通过，release 二进制新安装文件为 LF。
 
 执行 `cargo fmt --check`、相关故障注入定向测试和完整 `cargo test`。交付后更新 [当前架构](../../../../architecture.md) 中 init、skill bundle、写入顺序和失败恢复边界，并在 [CLI 规范](../../../../specs/cli.md) 记录自动升级、`v0`、`SKILL.md` 最后提交、回滚结果和 `--refresh` 关系。[文档格式规范](../../../../specs/document-format.md) 只约束项目工作包，无需修改。

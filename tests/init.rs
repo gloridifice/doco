@@ -46,7 +46,7 @@ fn selects_only_requested_integrations_and_deduplicates() {
                         .iter()
                         .any(|(file, _)| *file == "references/migrate.md")
                 );
-                for (file, content) in templates::FILES {
+                for (file, content) in templates::FILES.iter() {
                     assert_eq!(s.read(&format!("{directory}/{file}")), *content);
                 }
                 assert!(
@@ -69,7 +69,7 @@ fn skill_version_is_stored_only_in_the_root_skill() {
         s.read(".agents/skills/doco/SKILL.md")
             .contains("<!-- doco:skill version=v4 -->")
     );
-    for (file, _) in templates::FILES {
+    for (file, _) in templates::FILES.iter() {
         if *file != "SKILL.md" {
             assert!(
                 !s.read(&format!(".agents/skills/doco/{file}"))
@@ -103,7 +103,7 @@ fn old_managed_skill_is_upgraded_as_a_bundle_without_refresh() {
         .collect();
     assert!(applied[0].ends_with("create.md"), "{output}");
     assert!(applied[1].ends_with("SKILL.md"), "{output}");
-    for (file, content) in templates::FILES {
+    for (file, content) in templates::FILES.iter() {
         assert_eq!(s.read(&format!(".agents/skills/doco/{file}")), *content);
     }
     assert_eq!(s.read(".agents/skills/doco/custom.txt"), "keep");

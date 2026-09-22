@@ -34,7 +34,7 @@ fn parsed_skill_version(text: &str) -> Option<u64> {
 fn bundled_skill() -> &'static str {
     templates::FILES
         .iter()
-        .find_map(|(path, content)| (*path == "SKILL.md").then_some(*content))
+        .find_map(|(path, content)| (*path == "SKILL.md").then_some(content.as_str()))
         .expect("built-in SKILL.md exists")
 }
 

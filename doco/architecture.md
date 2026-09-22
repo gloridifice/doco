@@ -26,7 +26,7 @@ main → cli (clap) → terminal（console）
 - `src/lifecycle/` 执行创建、上下文选择和状态迁移；归档清理与一般迁移分开实现。CLI list 默认请求 active，并用独立开关追加 completed/archived；`list_changes_filtered` 在摘要 IO 前过滤状态，再通过 safety 读取 proposal 模式和生命周期时间，完整包复用 check 的任务解析器生成已完成/总数，proposal-only 显示不适用。列表按当前状态选择 created-at/completed-at/archived-at，以统一查询时刻计算紧凑年龄，不读取工作包 mtime。Reporter 只渲染已收集的行，兼容的 `list_changes` 库入口仍返回全部状态；Project 状态模型与菜单候选查询不读取这些摘要。五种状态迁移在写锁内按“预检 → 撤销缓存 → 业务提交 → 发布缓存”维护索引，业务提交后的缓存失败只警告。
 - `src/markdown.rs` 使用 CommonMark 解析器定位代码区和链接，辅以保守的标记/章节解析，不整体格式化用户文件。
 - `src/safety.rs` 集中文件归属检查、写锁、并发复核、同目录临时文件原子替换和目录操作。
-- `assets/skill/` 是唯一工作流模板来源，通过 `include_str!` 编译进二进制。不同 Agent 安装普通文件副本，不依赖运行时源码目录或符号链接。
+- `assets/skill/` 是唯一工作流模板来源，通过 `include_str!` 编译进二进制，首次访问时统一规范化为 LF，避免构建检出（例如 Windows `core.autocrlf`）决定新安装 bundle 与模板生成的换行；更新已有文件仍沿用目标文件的换行风格。不同 Agent 安装普通文件副本，不依赖运行时源码目录或符号链接。
 
 ## 持久化与生命周期
 

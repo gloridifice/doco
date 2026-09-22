@@ -27,8 +27,14 @@
   - Dependencies: 1.3, 1.4
   - Acceptance: `doco/architecture.md` 准确描述根 skill 唯一版本、组内提交顺序、补偿回滚及跨组非事务边界；`doco/specs/cli.md` 说明自动升级、`v0`、失败输出和 `--refresh` 关系，不修改无关文档格式规范。
 
+- [x] 2.3 规范化内嵌 bundle 换行并修复跨平台字节比较
+  - Dependencies: 1.3, 2.1
+  - Design: [implementation](implement.md)
+  - Acceptance: 内置 `templates::FILES` 以 LF 暴露规范内容；新安装、自动升级和模板生成不再继承构建检出换行；更新已有文件仍沿用目标文件换行风格，既有 LF/CRLF 支持不变。
+  - Verification: 在全部 `assets/skill/**` 为 CRLF 的检出（等同 `windows-latest` CI）下 `cargo test --all-targets` 通过，专项 `v3_bundle_upgrade_installs_optional_spec_template_without_refresh` 通过；release 二进制对空项目 `init --agent most` 后 `SKILL.md`、`references/create.md`、`templates/spec.md` 均为 LF。
+
 - [x] 3.1 执行最终验证并复核失败语义
-  - Dependencies: 2.1, 2.2
+  - Dependencies: 2.1, 2.2, 2.3
   - Acceptance: `cargo fmt --check`、故障注入定向测试、完整 `cargo test` 和 `doco check versioned-skill-refresh` 均通过；验证记录包含实际命令、结果与限制，并确认可捕获写入失败不会留下部分 skill 更新。
 
 ## Verification
@@ -43,3 +49,4 @@
 - `target/debug/doco.exe init --agent codex --dry-run --no-interactive --color never`：仓库自身安装副本和发布 bundle 全部为 SKIP，无写入。
 - `grep -R "doco:skill version" assets/skill .agents/skills/doco`：版本标记只出现在两个根 `SKILL.md` 安装/发布副本中，均为 `v1`。
 - 限制：故障注入覆盖可捕获的组内失败和外部并发改写；未模拟断电、进程强制终止或持续文件系统故障，设计与当前文档明确不对此承诺物理事务。
+- 换行规范化回归：全部 `assets/skill/**` 转为 CRLF 后稳定复现原 Windows CI 失败（安装内容 LF vs 内嵌 CRLF），修复后同一检出下 `cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test --all-targets` 与 `cargo build --release` 全部通过（12 个 test binary，0 失败）。

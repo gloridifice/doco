@@ -1,5 +1,13 @@
+use std::sync::LazyLock;
+
 pub const MARKER: &str = "<!-- doco:managed template=v1 -->";
-pub const FILES: &[(&str, &str)] = &[
+
+// Raw `include_str!` bytes follow whatever the build checkout contains, so a
+// Windows `core.autocrlf` checkout would embed CRLF. `FILES` normalizes once to
+// LF: new installs and marker parsing stay deterministic across platforms,
+// while updates to existing files still render with the destination file's
+// newline style via `markdown::styled`.
+static RAW_FILES: &[(&str, &str)] = &[
     ("SKILL.md", include_str!("../assets/skill/SKILL.md")),
     (
         "references/migrate.md",
@@ -38,22 +46,20 @@ pub const FILES: &[(&str, &str)] = &[
         include_str!("../assets/skill/templates/spec.md"),
     ),
 ];
+pub static FILES: LazyLock<Vec<(&'static str, String)>> = LazyLock::new(|| {
+    RAW_FILES
+        .iter()
+        .map(|(path, content)| (*path, crate::markdown::normalize(content)))
+        .collect()
+});
 pub fn change_file(name: &str, id: &str) -> String {
-    // Templates are embedded verbatim via `include_str!`, so their newline style
-    // reflects whatever bytes happened to be on disk at build time (e.g. a
-    // Windows checkout with core.autocrlf can materialize CRLF), not a
-    // deliberate choice. Normalize to LF before the exact-byte marker strip
-    // below, otherwise a CRLF source leaves the marker unmatched and it leaks
-    // into generated user files; normalizing also makes freshly generated
-    // content deterministic instead of inheriting an incidental encoding.
-    let normalized = crate::markdown::normalize(
-        FILES
-            .iter()
-            .find(|(path, _)| *path == format!("templates/{name}"))
-            .expect("built-in template exists")
-            .1,
-    );
-    normalized
+    // `FILES` is already LF-normalized, so the exact-byte marker strip below
+    // matches on every platform instead of depending on the build checkout.
+    FILES
+        .iter()
+        .find(|(path, _)| *path == format!("templates/{name}"))
+        .expect("built-in template exists")
+        .1
         .replace(&format!("{MARKER}\n"), "")
         .replace("{{id}}", id)
 }

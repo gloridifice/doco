@@ -246,7 +246,7 @@ fn validate_reused_claude_import(plan: &mut Plan, project: &Project) -> Result<(
             "CLAUDE.md and imported AGENTS.md both contain doco blocks; manual deduplication required"
         );
     }
-    for (file, generated) in templates::FILES {
+    for (file, generated) in templates::FILES.iter() {
         let full = format!("{skill_path}/{file}");
         let content = plan
             .effective_text(project, &full)?
