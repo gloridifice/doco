@@ -13,6 +13,9 @@ use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(
+    // The package is named `doco-cli`, but the CLI still presents itself as `doco`
+    // so that `--version` matches the released binary name.
+    name = "doco",
     version,
     about,
     long_about = "File-backed change management. Checks are mechanical, not semantic acceptance.",

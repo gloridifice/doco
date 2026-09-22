@@ -6,8 +6,13 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/gloridifice/doco"
 homepage = "https://github.com/gloridifice/doco"
 
-description = "Project document managerment and file-backed change management for coding agents."
+description = "Project document management and file-backed change management for coding agents."
 rust-version = "1.85"
+
+# The package is published as `doco-cli`; the library and the binary keep the
+# `doco` name used by external tests and the release workflow.
+[lib]
+name = "doco"
 
 [[bin]]
 name = "doco"
