@@ -77,10 +77,10 @@ enum Command {
     /// List active changes, optionally including historical states
     List {
         /// Include completed changes
-        #[arg(long)]
+        #[arg(short = 'c', long)]
         completed: bool,
         /// Include archived changes
-        #[arg(long)]
+        #[arg(short = 'a', long)]
         archived: bool,
     },
     /// Print current context paths; historical changes require --history
@@ -451,6 +451,18 @@ mod tests {
     fn color_accepts_global_positions() {
         assert!(Cli::try_parse_from(["doco", "--color", "never", "list"]).is_ok());
         assert!(Cli::try_parse_from(["doco", "list", "--color", "always"]).is_ok());
+    }
+
+    #[test]
+    fn list_accepts_short_history_flags() {
+        let cli = Cli::try_parse_from(["doco", "list", "-c", "-a"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Command::List {
+                completed: true,
+                archived: true
+            }
+        ));
     }
 
     #[test]

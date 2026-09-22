@@ -12,7 +12,7 @@
 
 stdout 和 stderr 分别判断。颜色与布局独立：TTY 中的 `list` 提供 STATE / CHANGE / TASKS / AGE 表头、对齐列、空态和状态统计；TASKS 显示已完成/总任务数，例如 `8/10`，AGE 显示当前状态对应生命周期事件距今时长。重定向时按 ID 排序输出 `state<TAB>id<TAB>done/total<TAB>age`，空列表无 stdout。`--color always` 不会把管道列表切换成 TTY 布局。Clap 的帮助、版本和参数错误保持标准无色格式。
 
-`list` 默认只查询并显示 active。`--completed` 在 active 之外追加 completed，`--archived` 追加 archived；两项可以组合以显示全部状态。active 始终包含，首版不提供排除 active 或只显示历史状态的模式。状态过滤在读取 proposal、任务和生命周期时间之前完成，因此未启用状态中的任务或工作包内容错误不影响结果；排序及 TTY 底部统计只基于可见行。
+`list` 默认只查询并显示 active。`--completed`（缩写 `-c`）在 active 之外追加 completed，`--archived`（缩写 `-a`）追加 archived；两项可以组合以显示全部状态。active 始终包含，首版不提供排除 active 或只显示历史状态的模式。状态过滤在读取 proposal、任务和生命周期时间之前完成，因此未启用状态中的任务或工作包内容错误不影响结果；排序及 TTY 底部统计只基于可见行。
 
 任务数先安全读取 active/completed 的 proposal 模式。完整变更读取 `work/tasks.md`，只统计任务解析器识别的 `[ ]` / `[x]` 任务行，忽略围栏示例和注释；任务文件为空显示 `0/0`，缺失显示 `?`。仅 proposal 变更和已归档变更显示 `-`，不读取不存在或已丢弃的工作材料。无模式标记的包仍是完整变更，不能因 tasks 或整个 work 缺失而显示 `-`。不安全路径、读取失败、非法 UTF-8 或非法模式仍报错，不伪装成零任务。计数是即时只读摘要，不等同于 check 通过或真实验收。
 
