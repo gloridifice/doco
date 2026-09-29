@@ -32,12 +32,17 @@ fn list_counts_checkboxes_not_examples_and_tracks_lifecycle() {
     let before = s.files();
     let active = "active\tempty\t0/0\t0m\nactive\tmissing\t?\t0m\nactive\tmixed\t2/3\t0m\nactive\tproposal\t-\t0m\n";
     let completed = "completed\tcompleted\t2/2\t0m\nactive\tempty\t0/0\t0m\nactive\tmissing\t?\t0m\nactive\tmixed\t2/3\t0m\nactive\tproposal\t-\t0m\ncompleted\tproposal-done\t-\t0m\n";
-    let archived = "archived\tarchived\t-\t0m\nactive\tempty\t0/0\t0m\nactive\tmissing\t?\t0m\nactive\tmixed\t2/3\t0m\nactive\tproposal\t-\t0m\n";
     let all = "archived\tarchived\t-\t0m\ncompleted\tcompleted\t2/2\t0m\nactive\tempty\t0/0\t0m\nactive\tmissing\t?\t0m\nactive\tmixed\t2/3\t0m\nactive\tproposal\t-\t0m\ncompleted\tproposal-done\t-\t0m\n";
-    assert_eq!(s.ok(&["list"]), active);
-    assert_eq!(s.ok(&["list", "--completed"]), completed);
-    assert_eq!(s.ok(&["list", "--archived"]), archived);
-    assert_eq!(s.ok(&["list", "--completed", "--archived"]), all);
+    for (args, expected) in [
+        (vec!["list"], active),
+        (vec!["list", "--completed"], completed),
+        (vec!["list", "-c"], completed),
+        (vec!["list", "--archived"], all),
+        (vec!["list", "-a"], all),
+        (vec!["list", "--completed", "--archived"], all),
+    ] {
+        assert_eq!(s.ok(&args), expected, "{args:?}");
+    }
     assert_eq!(s.files(), before);
     let project = Project::open(s.dir.path()).unwrap();
     let rows = lifecycle::list_changes(&project).unwrap();
@@ -105,6 +110,7 @@ fn hidden_states_are_not_read_until_their_flag_is_enabled() {
 
     assert_eq!(s.ok(&["list"]), "");
     s.err(&["list", "--completed"], "hard");
+    s.err(&["list", "--archived"], "hard");
 }
 
 #[test]

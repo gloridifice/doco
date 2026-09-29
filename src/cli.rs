@@ -82,7 +82,7 @@ enum Command {
         /// Include completed changes
         #[arg(short = 'c', long)]
         completed: bool,
-        /// Include archived changes
+        /// Include completed and archived changes
         #[arg(short = 'a', long)]
         archived: bool,
     },
@@ -251,7 +251,11 @@ fn execute(
             archived,
         } => {
             reporter.emit(Event::Changes {
-                changes: &lifecycle::list_changes_filtered(&project, completed, archived)?,
+                changes: &lifecycle::list_changes_filtered(
+                    &project,
+                    completed || archived,
+                    archived,
+                )?,
             })?;
             Ok(())
         }
