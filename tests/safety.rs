@@ -78,6 +78,20 @@ fn refuses_linked_parent_directories_before_init_writes() {
     }
 }
 #[test]
+fn library_discovery_skips_external_links_and_directory_cycles() {
+    let s = Sandbox::new();
+    s.init();
+    s.ok(&["new", "local", "--proposal-only"]);
+    let outside = Sandbox::new();
+    outside.write("doco/architecture.md", "# Incomplete external library\n");
+    let before = outside.files();
+    link_dir(outside.dir.path(), &s.path("external"));
+    link_dir(s.dir.path(), &s.path("cycle"));
+    assert_eq!(s.ok(&["list"]), "active\tlocal\t-\t0m\n");
+    assert_eq!(outside.files(), before);
+}
+
+#[test]
 fn archive_never_traverses_external_work_link() {
     let s = Sandbox::new();
     s.init();

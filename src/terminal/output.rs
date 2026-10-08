@@ -76,6 +76,9 @@ impl<O: Write, E: Write> TerminalReporter<O, E> {
     fn render_changes(&mut self, changes: &[ChangeRow]) -> io::Result<()> {
         if !self.rich_list {
             for change in changes {
+                if let Some(project) = &change.project {
+                    write!(self.stdout, "{}\t", sanitize_line(project))?;
+                }
                 writeln!(
                     self.stdout,
                     "{}\t{}\t{}\t{}",
@@ -104,8 +107,21 @@ impl<O: Write, E: Write> TerminalReporter<O, E> {
             .max()
             .unwrap_or(0)
             .max(5);
+        let project_width = changes
+            .iter()
+            .filter_map(|change| change.project.as_ref())
+            .map(|path| console::measure_text_width(&sanitize_line(path)))
+            .max()
+            .map(|width| width.max(7));
         let heading = Style::new().bold().force_styling(self.stdout_color);
         if self.columns >= 50 {
+            if let Some(width) = project_width {
+                write!(
+                    self.stdout,
+                    "{}  ",
+                    heading.apply_to(format!("{:<width$}", "PROJECT"))
+                )?;
+            }
             writeln!(
                 self.stdout,
                 "{}  {}  {}  {}",
@@ -115,6 +131,11 @@ impl<O: Write, E: Write> TerminalReporter<O, E> {
                 heading.apply_to("AGE")
             )?;
             for change in changes {
+                if let Some(width) = project_width {
+                    let project = sanitize_line(change.project.as_deref().unwrap_or(""));
+                    let padding = width.saturating_sub(console::measure_text_width(&project));
+                    write!(self.stdout, "{project}{}  ", " ".repeat(padding))?;
+                }
                 let state = format!("{:<9}", change.state.as_str());
                 let tasks = change.tasks.to_string();
                 writeln!(
@@ -128,6 +149,9 @@ impl<O: Write, E: Write> TerminalReporter<O, E> {
             }
         } else {
             for change in changes {
+                if let Some(project) = &change.project {
+                    write!(self.stdout, "{}  ", sanitize_line(project))?;
+                }
                 writeln!(
                     self.stdout,
                     "{}  {}  {}  {}",
@@ -236,12 +260,14 @@ mod tests {
     fn changes() -> Vec<ChangeRow> {
         vec![
             ChangeRow {
+                project: None,
                 id: "alpha".into(),
                 state: State::Active,
                 tasks: TaskCount::Known { done: 1, total: 3 },
                 age: LifecycleAge::Known(Duration::from_secs(10 * 60)),
             },
             ChangeRow {
+                project: None,
                 id: "done".into(),
                 state: State::Completed,
                 tasks: TaskCount::Known { done: 2, total: 2 },
@@ -295,6 +321,40 @@ mod tests {
         let text = String::from_utf8(stdout).unwrap();
         assert!(!text.contains("STATE"));
         assert!(text.contains("active  alpha  1/3  10m\n"));
+    }
+
+    #[test]
+    fn multi_library_list_labels_paths_in_tty_and_plain_output() {
+        let mut rows = changes();
+        rows[0].project = Some(".".into());
+        rows[1].project = Some("api\tmodule\u{1b}".into());
+        for (tty, columns) in [(true, 80), (true, 30), (false, 80)] {
+            let mut reporter = TerminalReporter::new(
+                Vec::new(),
+                Vec::new(),
+                ColorMode::Never,
+                &caps(tty, columns),
+            );
+            reporter.emit(Event::Changes { changes: &rows }).unwrap();
+            let text = String::from_utf8(reporter.into_inner().0).unwrap();
+            assert_eq!(text.contains("PROJECT"), tty && columns >= 50);
+            assert!(text.contains("api\\tmodule\\u{1b}"), "{text:?}");
+            assert!(!text.contains('\u{1b}'));
+            if !tty {
+                assert_eq!(
+                    text,
+                    ".\tactive\talpha\t1/3\t10m\napi\\tmodule\\u{1b}\tcompleted\tdone\t2/2\t1d2h\n"
+                );
+            }
+        }
+        let mut stdout = Vec::new();
+        doco::ui::PlainReporter::new(&mut stdout, Vec::new())
+            .emit(Event::Changes { changes: &rows })
+            .unwrap();
+        assert_eq!(
+            String::from_utf8(stdout).unwrap(),
+            ".\tactive\talpha\t1/3\t10m\napi\\tmodule\\u{1b}\tcompleted\tdone\t2/2\t1d2h\n"
+        );
     }
 
     #[test]

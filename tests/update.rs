@@ -21,10 +21,7 @@ fn updates_all_installed_integrations_and_is_idempotent() {
         (".claude/skills/doco", "CLAUDE.md"),
     ] {
         let skill = format!("{directory}/SKILL.md");
-        s.write(
-            &skill,
-            &s.read(&skill).replace("<!-- doco:skill version=v4 -->", ""),
-        );
+        s.write(&skill, &s.read(&skill).replace("version=v5", "version=v4"));
         let reference = format!("{directory}/references/create.md");
         s.write(
             &reference,
@@ -33,7 +30,7 @@ fn updates_all_installed_integrations_and_is_idempotent() {
         s.write(
             entry,
             &s.read(entry)
-                .replace("<!-- doco:entry template=v1 -->\n", "")
+                .replace("template=v2", "template=v1")
                 .replace("Perform only", "Perform exactly"),
         );
     }
@@ -49,7 +46,7 @@ fn updates_all_installed_integrations_and_is_idempotent() {
             assert_eq!(s.read(&format!("{directory}/{file}")), *content);
         }
         let entry = s.read(entry);
-        assert!(entry.contains("<!-- doco:entry template=v1 -->"));
+        assert!(entry.contains("<!-- doco:entry template=v2 -->"));
         assert!(entry.contains("Perform only"));
         assert!(!entry.contains("Perform exactly"));
     }
@@ -70,7 +67,7 @@ fn v3_bundle_upgrade_installs_optional_spec_template_without_refresh() {
         s.ok(&["init", "--agent", "most", "--agent", "claude"]);
         for directory in [".agents/skills/doco", ".claude/skills/doco"] {
             let skill = format!("{directory}/SKILL.md");
-            s.write(&skill, &s.read(&skill).replace("version=v4", "version=v3"));
+            s.write(&skill, &s.read(&skill).replace("version=v5", "version=v3"));
             fs::remove_file(s.path(&format!("{directory}/templates/spec.md"))).unwrap();
             s.write(
                 &format!("{directory}/references/create.md"),
@@ -210,11 +207,11 @@ fn newer_entry_templates_are_not_downgraded_without_refresh() {
     s.init();
     s.write(
         "AGENTS.md",
-        &s.read("AGENTS.md").replace("template=v1", "template=v2"),
+        &s.read("AGENTS.md").replace("template=v2", "template=v3"),
     );
     let before = s.files();
     s.err(&["update"], "managed navigation differs");
     assert_eq!(s.files(), before);
     s.ok(&["update", "--refresh"]);
-    assert!(s.read("AGENTS.md").contains("template=v1"));
+    assert!(s.read("AGENTS.md").contains("template=v2"));
 }

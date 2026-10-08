@@ -1,4 +1,5 @@
 pub mod check;
+mod discovery;
 pub mod fix;
 pub(crate) mod index;
 pub mod init;

@@ -7,16 +7,23 @@ use std::{
 };
 use tempfile::NamedTempFile;
 
-fn inspect_node(path: &Path, meta: &Metadata) -> Result<()> {
-    if meta.file_type().is_symlink() {
-        bail!("refusing symbolic link: {}", path.display());
-    }
+pub(crate) fn is_link(meta: &Metadata) -> bool {
     #[cfg(windows)]
     {
         use std::os::windows::fs::MetadataExt;
         if meta.file_attributes() & 0x400 != 0 {
-            bail!("refusing reparse point: {}", path.display());
+            return true;
         }
+    }
+    meta.file_type().is_symlink()
+}
+
+fn inspect_node(path: &Path, meta: &Metadata) -> Result<()> {
+    if is_link(meta) {
+        bail!(
+            "refusing symbolic link or reparse point: {}",
+            path.display()
+        );
     }
     if meta.is_file() && link_count(path, meta)? != 1 {
         bail!("refusing hard-linked file: {}", path.display());

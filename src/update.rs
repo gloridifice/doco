@@ -20,6 +20,19 @@ pub fn run_with_ui(
     reporter: &mut dyn Reporter,
 ) -> Result<()> {
     project.initialized()?;
+    if let Some(mut parent) = project.parent()? {
+        while let Some(ancestor) = parent.parent()? {
+            parent = ancestor;
+        }
+        ui::text(
+            reporter,
+            &format!(
+                "Child library: no integrations updated. To update shared workflows, run doco --root \"{}\" update.\n",
+                parent.root().display()
+            ),
+        )?;
+        return Ok(());
+    }
     let plan = build(project, refresh);
     plan.show(project, reporter)?;
     plan.ensure_valid()?;

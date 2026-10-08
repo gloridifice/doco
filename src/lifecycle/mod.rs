@@ -10,7 +10,7 @@ use crate::{
 use anyhow::{Context, Result, bail};
 pub use archive::{archive, archive_with_ui};
 pub use context::{context, context_with_ui};
-pub use list::{list_changes, list_changes_filtered};
+pub use list::{list_changes, list_changes_filtered, list_project_changes_filtered};
 use std::fs;
 
 pub fn new_change(project: &Project, id: &str) -> Result<()> {

@@ -22,9 +22,9 @@ use std::path::PathBuf;
     color = clap::ColorChoice::Never
 )]
 struct Cli {
-    /// Explicit project root (defaults to the current directory; no ancestor search)
-    #[arg(long, global = true, default_value = ".")]
-    root: PathBuf,
+    /// Exact library root; otherwise use the nearest ancestor library (init uses cwd)
+    #[arg(long, global = true)]
+    root: Option<PathBuf>,
     /// Business-output color policy
     #[arg(long, global = true, value_enum, default_value_t = ColorMode::Auto)]
     color: ColorMode,
@@ -77,7 +77,7 @@ enum Command {
         #[arg(long)]
         proposal_only: bool,
     },
-    /// List active changes, optionally including historical states
+    /// List changes across the project libraries, current library first
     List {
         /// Include completed changes
         #[arg(short = 'c', long)]
@@ -193,7 +193,13 @@ fn execute(
     } else {
         InteractionMode::Auto
     };
-    let project = Project::open(&cli.root)?;
+    let project = match &cli.root {
+        Some(root) => Project::open(root)?,
+        None if matches!(&cli.command, Command::Init { .. }) => {
+            Project::open(&std::env::current_dir()?)?
+        }
+        None => Project::discover(&std::env::current_dir()?)?,
+    };
     let terminal_prompter = TerminalPrompter::new(cli.color, capabilities);
     let can_prompt = interaction != InteractionMode::Never && capabilities.interactive();
 
@@ -209,7 +215,7 @@ fn execute(
                 "Project root:",
                 &project.root().display().to_string(),
             )?;
-            if agent.is_empty() {
+            if agent.is_empty() && project.parent()?.is_none() {
                 if !can_prompt {
                     bail!("non-interactive init requires --agent most|claude; no files written");
                 }
@@ -251,7 +257,7 @@ fn execute(
             archived,
         } => {
             reporter.emit(Event::Changes {
-                changes: &lifecycle::list_changes_filtered(
+                changes: &lifecycle::list_project_changes_filtered(
                     &project,
                     completed || archived,
                     archived,

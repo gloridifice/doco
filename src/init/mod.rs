@@ -63,14 +63,30 @@ pub fn run_with_ui(
     refresh: bool,
     reporter: &mut dyn Reporter,
 ) -> Result<()> {
-    if integrations.is_empty()
+    let parent = project.parent()?;
+    if (parent.is_none() && integrations.is_empty())
         || integrations
             .iter()
             .any(|integration| !["most", "claude"].contains(integration))
     {
         bail!("explicit known integration selection required");
     }
-    let plan = build(project, integrations, refresh);
+    if let Some(parent) = &parent {
+        if project.root().starts_with(parent.path("doco")) {
+            bail!("cannot initialize a child library inside doco storage");
+        }
+        ui::line(
+            reporter,
+            Tone::Info,
+            "Parent library:",
+            &parent.root().display().to_string(),
+        )?;
+        ui::text(
+            reporter,
+            "Child library: only doco/ is initialized; agent selection and integration refresh are skipped. Parent and existing child integrations are unchanged.\n",
+        )?;
+    }
+    let plan = build(project, integrations, refresh, parent.is_some());
     plan.show(project, reporter)?;
     plan.ensure_valid()?;
     if dry_run {
@@ -99,7 +115,7 @@ pub fn run_with_ui(
     Ok(())
 }
 
-fn build(project: &Project, selected: &[&str], refresh: bool) -> Plan {
+fn build(project: &Project, selected: &[&str], refresh: bool, child: bool) -> Plan {
     let mut plan = Plan::default();
     for directory in [
         "doco",
@@ -118,6 +134,9 @@ fn build(project: &Project, selected: &[&str], refresh: bool) -> Plan {
         ("doco/architecture.md", templates::ARCHITECTURE),
     ] {
         plan.file(project, path, |old| Ok(old.unwrap_or(default).to_string()));
+    }
+    if child {
+        return plan;
     }
     let integrations: Vec<_> = selected
         .iter()

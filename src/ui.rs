@@ -71,6 +71,8 @@ pub type ModifiedAge = LifecycleAge;
 
 #[derive(Debug)]
 pub struct ChangeRow {
+    /// Top-library-relative path for multi-library lists; absent for local lists.
+    pub project: Option<String>,
     pub id: String,
     pub state: State,
     pub tasks: TaskCount,
@@ -202,6 +204,9 @@ impl<O: Write, E: Write> Reporter for PlainReporter<O, E> {
             Event::Diff { text } => write!(self.stdout, "{}", sanitize(text)),
             Event::Changes { changes } => {
                 for change in changes {
+                    if let Some(project) = &change.project {
+                        write!(self.stdout, "{}\t", sanitize_line(project))?;
+                    }
                     writeln!(
                         self.stdout,
                         "{}\t{}\t{}\t{}",

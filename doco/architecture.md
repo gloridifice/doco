@@ -19,18 +19,19 @@ main → cli (clap) → terminal（console）
 - `src/main.rs` 只退出 `cli::run` 返回的状态码；`src/cli.rs` 定义参数、候选状态过滤、交互 Agent/变更选择、命令分发和顶层语义错误渲染。
 - `src/terminal/` 是二进制侧终端适配层：一次性探测各流 TTY、TERM、NO_COLOR 和尺寸，使用 console 渲染业务颜色、TTY list 和局部选择循环。选择器支持方向键、Space、Enter、Esc 和 Ctrl-C，以 RAII 恢复光标；它不保存业务状态。
 - `src/ui.rs` 是库侧输出端口，定义语义事件、流、色调和控制字符过滤。init、check、lifecycle 通过 Reporter 输出；旧公开入口使用 PlainReporter 保持非终端调用。Clap 不进入领域层。
-- `src/lib.rs` 提供项目根、稳定 ID 和从目录推导的状态模型，`Project::changes` 与 `Project::resolve` 通过 index 查询；`src/index.rs` 维护可丢弃的本机 CSV 索引 `doco/tmp/changes-index.csv`，只缓存 `doco/changes` 直接子目录的 ID 与状态，读取时要求三个状态目录修改时间与缓存逐项相等，否则回退权威扫描；指定 ID 始终核对真实路径；写命令在业务提交前撤销缓存、提交后原子重写。`src/fix.rs` 是显式强制重建入口。`src/package.rs` 定义共享的工作包模式、显式标记和兼容解析，供模板、检查及各生命周期读取复用；其工作规格发现函数复用 safety，按路径排序返回可选 `work/specs/**/*.md`，供 context/check 共用。
-- `src/init/` 将全部目标规划为 CREATE/UPDATE/SKIP 或 CONFLICT，处理脚手架、受管入口、原生 skill 安装和有限的导入去重。安装目标只有 Most agents（`.agents` / `AGENTS.md`）与 Claude（`.claude` / `CLAUDE.md`）。根 `SKILL.md` 是 bundle 唯一版本源，DOCO 入口块有独立模板版本；内置版本较高时自动刷新，同版本差异或强制降级要求 `--refresh`。每个 skill 目录使用独立的可回滚文件组，其他文件先写、根 skill 最后提交。
-- `src/update.rs` 检测上述两个既有完整集成并复用 init 的 integration/plan/entry/skill 路径，只更新 skill bundle 和入口文件，不创建缺失集成或项目文档。旧 `.pi`、`.codex` skill 路径是迁移冲突；Claude 只导入 `AGENTS.md` 时复用 Most agents，不视为独立 Claude 集成。
+- `src/discovery.rs` 从目录位置推导父子库关系，不保存注册表。`Project::open` 精确打开目录，`Project::discover` 为普通 CLI 命令从当前目录向上寻找最近库；`init` 始终针对当前目录，显式 `--root` 不回退。Git 根限制祖先查找，后代扫描跳过嵌套 Git 根、存储/集成/依赖/构建目录和链接。聚合范围为最顶层祖先库及其后代，按当前库优先、其余父先于子的深度优先顺序收集；损坏的库报错而非静默跳过。具体发现与排序契约见 [CLI](specs/cli.md#项目定位与父子库)。
+- `src/lib.rs` 提供项目根、库内稳定 ID 和从目录推导的状态模型，`Project::changes` 与 `Project::resolve` 通过 index 查询；`src/index.rs` 维护可丢弃的本机 CSV 索引 `doco/tmp/changes-index.csv`，只缓存 `doco/changes` 直接子目录的 ID 与状态，读取时要求三个状态目录修改时间与缓存逐项相等，否则回退权威扫描；指定 ID 始终核对真实路径；写命令在业务提交前撤销缓存、提交后原子重写。`src/fix.rs` 是显式强制重建入口。`src/package.rs` 定义共享的工作包模式、显式标记和兼容解析，供模板、检查及各生命周期读取复用；其工作规格发现函数复用 safety，按路径排序返回可选 `work/specs/**/*.md`，供 context/check 共用。
+- `src/init/` 将全部目标规划为 CREATE/UPDATE/SKIP 或 CONFLICT，处理脚手架、受管入口、原生 skill 安装和有限的导入去重。检测到父库时只规划目标库内的 doco 文档，不选择 Agent，也不创建或修改 skill、入口或父库；显式 Agent 与 refresh 不扩大子库范围。根库安装目标只有 Most agents（`.agents` / `AGENTS.md`）与 Claude（`.claude` / `CLAUDE.md`）。根 `SKILL.md` 是 bundle 唯一版本源，DOCO 入口块有独立模板版本；内置版本较高时自动刷新，同版本差异或强制降级要求 `--refresh`。每个 skill 目录使用独立的可回滚文件组，其他文件先写、根 skill 最后提交。
+- `src/update.rs` 检测上述两个既有完整集成并复用 init 的 integration/plan/entry/skill 路径，只更新 skill bundle 和入口文件，不创建缺失集成或项目文档。子库 update 是零写入的成功提示，要求在顶层库显式更新共享集成，不自动修改父库。旧 `.pi`、`.codex` skill 路径是迁移冲突；Claude 只导入 `AGENTS.md` 时复用 Most agents，不视为独立 Claude 集成。
 - `src/check/` 解析 proposal 中显式的工作包模式和可选生命周期时间标记，检查文档结构、模板残留、任务格式、依赖和明确的阻塞/证据字段，不评价设计质量或测试真实性。无模式标记兼容为完整包；缺少生命周期标记兼容为旧包；proposal-only 必须完全没有 work，严格完成检查从 proposal 读取验证证据。完整包的可选工作规格逐份检查非空正文、模板残留、引用和显式阻塞，不要求固定章节、任务格式或独立验证字段。
-- `src/lifecycle/` 执行创建、上下文选择和状态迁移；归档清理与一般迁移分开实现。CLI list 默认请求 active，`--completed` 追加 completed，`--archived` 同时追加 completed 和 archived；`list_changes_filtered` 在摘要 IO 前过滤状态，再通过 safety 读取 proposal 模式和生命周期时间，完整包复用 check 的任务解析器生成已完成/总数，proposal-only 显示不适用。列表按当前状态选择 created-at/completed-at/archived-at，以统一查询时刻计算紧凑年龄，不读取工作包 mtime。Reporter 只渲染已收集的行，兼容的 `list_changes` 库入口仍返回全部状态；Project 状态模型与菜单候选查询不读取这些摘要。五种状态迁移在写锁内按“预检 → 撤销缓存 → 业务提交 → 发布缓存”维护索引，业务提交后的缓存失败只警告。
+- `src/lifecycle/` 执行创建、上下文选择和状态迁移；归档清理与一般迁移分开实现。CLI list 默认请求 active，`--completed` 追加 completed，`--archived` 同时追加 completed 和 archived；CLI 通过 `list_project_changes_filtered` 聚合库，兼容的 `list_changes_filtered` 保持本库查询；二者在摘要 IO 前过滤状态，再通过 safety 读取 proposal 模式和生命周期时间，完整包复用 check 的任务解析器生成已完成/总数，proposal-only 显示不适用。列表按当前状态选择 created-at/completed-at/archived-at，以统一查询时刻计算紧凑年龄，不读取工作包 mtime。多库行带最顶层库相对路径，单库保持原输出格式；库内按 ID 排序。Reporter 只渲染已收集的行，兼容的 `list_changes` 库入口仍返回全部状态；Project 状态模型与菜单候选查询不读取这些摘要。五种状态迁移在写锁内按“预检 → 撤销缓存 → 业务提交 → 发布缓存”维护索引，业务提交后的缓存失败只警告。
 - `src/markdown.rs` 使用 CommonMark 解析器定位代码区和链接，辅以保守的标记/章节解析，不整体格式化用户文件。
 - `src/safety.rs` 集中文件归属检查、写锁、并发复核、同目录临时文件原子替换和目录操作。
 - `assets/skill/` 是唯一工作流模板来源，通过 `include_str!` 编译进二进制，首次访问时统一规范化为 LF，避免构建检出（例如 Windows `core.autocrlf`）决定新安装 bundle 与模板生成的换行；更新已有文件仍沿用目标文件的换行风格。不同 Agent 安装普通文件副本，不依赖运行时源码目录或符号链接。
 
 ## 持久化与生命周期
 
-没有数据库、中央索引或复制状态的 front matter。状态仅来自 `doco/changes/{active,completed,archived}/<id>`，三个目录之间 ID 必须唯一；proposal 中的生命周期时间只用于显示，不能授权或推断状态。ID 使用小写 ASCII 字母、数字和单个内部连字符，长度不超过 80；拒绝 Windows 保留设备名。
+没有数据库、中央索引或复制状态的 front matter。状态仅来自 `doco/changes/{active,completed,archived}/<id>`，同一库的三个目录之间 ID 必须唯一；不同库可同名，状态、索引与锁分别独立，不做跨库迁移或联动；proposal 中的生命周期时间只用于显示，不能授权或推断状态。ID 使用小写 ASCII 字母、数字和单个内部连字符，长度不超过 80；拒绝 Windows 保留设备名。
 
 新工作包的 proposal 包含单行 `doco:lifecycle v=1` HTML 注释，以 UTC RFC3339 秒精度保存 created-at、completed-at、archived-at。new 写创建时间，complete 写或覆盖最近完成时间，archive/cancel 写归档时间；reopen 保留已有字段。标记随 proposal 进入版本控制并在归档后保留。旧包可没有标记，列表显示未知；非法或重复标记是格式错误。索引不缓存这些时间。
 
@@ -60,9 +61,9 @@ complete 在移动前写 completed-at；移动失败时源仍为 active，列表
 
 ## 上下文与 Agent 接入边界
 
-默认 context 从 architecture、指定 active 工作包及其显式引用输出路径候选；完整包加入 proposal、implement、tasks 和自动发现的 `work/specs/**/*.md`，不要求规格先被引用；不自动枚举其他 work 材料。proposal-only 只加入 proposal。工作规格明确为目标契约而非当前事实，缺失或空规格目录不警告。它排除其他变更、tmp 和能识别的被替代 ADR。`--history` 只显式纳入指定历史工作包并标注快照。`doco:<id>` 引用解析当前位置，但不会因此自动把其他变更加入阅读范围。CLI 不约束外部搜索工具，也不自动判断所有语义相关资料。
+除 list 聚合外，命令与交互候选保持所选库边界。默认 context 从本库 architecture、指定 active 工作包及其显式引用输出路径候选；完整包加入 proposal、implement、tasks 和自动发现的 `work/specs/**/*.md`，不要求规格先被引用；不自动枚举其他 work 材料。proposal-only 只加入 proposal。工作规格明确为目标契约而非当前事实，缺失或空规格目录不警告。它排除其他变更、tmp 和能识别的被替代 ADR。`--history` 只显式纳入指定历史工作包并标注快照。`doco:<id>` 引用解析本库当前位置，但不会因此自动把其他变更加入阅读范围。CLI 不约束外部搜索工具，也不自动判断所有语义相关资料。
 
-根入口使用独立 DOCO 标记行及唯一入口模板版本，保留区块外字节。入口明确 doco 变更只用于显式跟踪和设计/协调，不是所有行为或实现细节修改的前置条件；未创建变更也不免除同步受影响当前文档的责任。入口归属只由代码围栏外唯一且有序闭合的 `DOCO:START` / `DOCO:END` 标记界定；块外出现 doco 标题、skill 路径或其他相关自然语言不参与归属或冲突判断。无标记内容始终按用户内容保留，初始化会另行追加受管块；标记缺失、重复、嵌套或顺序错误时要求删除整个 DOCO 块后重试。Claude 的安全、独立 `@AGENTS.md` / `@./AGENTS.md` 导入表示复用 Most agents；复杂导入或与独立 Claude 入口并存要求人工处理。`.pi/skills/doco`、`.codex/skills/doco` 不再复用，也不会自动移动或删除。
+根入口使用独立 DOCO 标记行及唯一入口模板版本，保留区块外字节。子库复用顶层库的 skill/入口，不自动生成子级 Agent 文件；skill 与入口明确就近选库、库内 ID、共享约束与局部事实的职责，skill 路径从入口所在目录解析，文档路径从所选库解析，不自动复制或覆盖父子文档。入口明确 doco 变更只用于显式跟踪和设计/协调，不是所有行为或实现细节修改的前置条件；未创建变更也不免除同步受影响当前文档的责任。入口归属只由代码围栏外唯一且有序闭合的 `DOCO:START` / `DOCO:END` 标记界定；块外出现 doco 标题、skill 路径或其他相关自然语言不参与归属或冲突判断。无标记内容始终按用户内容保留，初始化会另行追加受管块；标记缺失、重复、嵌套或顺序错误时要求删除整个 DOCO 块后重试。Claude 的安全、独立 `@AGENTS.md` / `@./AGENTS.md` 导入表示复用 Most agents；复杂导入或与独立 Claude 入口并存要求人工处理。`.pi/skills/doco`、`.codex/skills/doco` 不再复用，也不会自动移动或删除。
 
 仅检查已知项目级发现位置和可见 override/config 提示，不审计用户全局插件、模型设置、权限、可信状态或所有加载开关。不自动登录或调用模型。Agent 的实际技能发现与规则遵循需要在客户端会话中另行验证。
 

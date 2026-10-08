@@ -71,6 +71,22 @@ You: Start implementing.
 
 To see the current list of changes, run `doco list`.
 
+## Nested libraries
+
+Run `doco init` in a subdirectory of an initialized project to create a local
+`doco/` library. Child libraries do not install skills or create `AGENTS.md` or
+`CLAUDE.md`; they reuse the top-level workflow, leaving existing instructions intact.
+
+Ordinary commands use the nearest ancestor library. Use `--root <directory>`
+to select an exact library; `init` always targets the current or specified directory.
+Change IDs, writes, caches and locks remain local to each library.
+
+`doco list` shows active changes across the whole project family, including
+siblings: current library first, then the remaining libraries in parent-before-child
+order. Multi-library output adds a `PROJECT` column. `-c` includes completed changes;
+`-a` includes all states. Nested Git roots and linked directories are excluded.
+Run `doco update` at the top-level library to update the shared workflow.
+
 ## More about changes
 
 Doco separates a change into `proposal.md`, which is retained after archiving, and a `work/` directory, which is kept only while working on the change. The `work/` directory contains optional `implement.md`, `specs/`, and `tasks.md` materials to help keep work consistent across sessions and models.

@@ -4,7 +4,7 @@ use std::ops::Range;
 
 const START: &str = "<!-- DOCO:START -->";
 const END: &str = "<!-- DOCO:END -->";
-const ENTRY_VERSION: u64 = 1;
+const ENTRY_VERSION: u64 = 2;
 
 pub fn block_range(text: &str) -> Result<Option<Range<usize>>> {
     let lines = markdown::body_lines(text);
@@ -155,11 +155,11 @@ mod tests {
         let skill = ".agents/skills/doco";
         let generated = generated_block(skill);
         for old in [
-            generated.replace("<!-- doco:entry template=v1 -->\n", ""),
-            generated.replace("template=v1", "template=invalid"),
+            generated.replace("<!-- doco:entry template=v2 -->\n", ""),
+            generated.replace("template=v2", "template=invalid"),
             generated.replace(
-                "<!-- doco:entry template=v1 -->",
-                "<!-- doco:entry template=v1 -->\n<!-- doco:entry template=v1 -->",
+                "<!-- doco:entry template=v2 -->",
+                "<!-- doco:entry template=v2 -->\n<!-- doco:entry template=v2 -->",
             ),
         ] {
             assert_eq!(

@@ -89,7 +89,7 @@ check 和 complete 自动递归检查所选完整包内全部 `work/specs/**/*.m
 
 ## 引用和归档
 
-工作包使用相对 Markdown 链接；稳定跨变更引用可用 `[历史目标](doco:change-id)`。context 解析其状态和位置，但不会自动读取其他变更。
+工作包使用相对 Markdown 链接；稳定跨变更引用可用 `[历史目标](doco:change-id)`。ID 和该引用仅在所选库解析，父子库允许同名且不互相回退；context 解析其状态和位置，但不会自动读取其他变更或父子库文档。
 
 context 自动发现所选完整包内的 `work/specs/**/*.md`，排序并去重，不要求先从 implement/tasks 链接。它继续跟随显式 Markdown 链接与形似路径的行内代码，从当前架构和所选工作包找候选资料；不自动纳入其他 work 材料或其他变更的规格。completed 规格只有显式 `--history` 才进入阅读范围，并标注为快照。ADR 文首可用 `Status: Superseded`、`Superseded by:`、`已被 ADR-0002 替代` 或 `状态：已替代` 标注旧决策；其他表述需要 Agent 判断，不能假设工具全部识别。
 

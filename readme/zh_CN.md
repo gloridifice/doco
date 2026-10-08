@@ -72,6 +72,14 @@ AI：doco new optimize-cli-commands
 
 要查看目前的变更列表，使用 `doco list`。
 
+## 子目录库
+
+在已初始化项目的子目录中执行 `doco init`，只创建该目录的 `doco/` 库，不安装 skill、不创建 `AGENTS.md` 或 `CLAUDE.md`，也不修改既有入口。子库复用顶层库的工作流，无需选择 Agent。
+
+普通命令向上找到最近的库；`--root <目录>` 精确选库，不回退父目录。`init` 始终在当前或指定目录初始化。各库的变更 ID、写操作、索引和锁相互独立。
+
+`doco list` 默认列出整个项目父子库及兄弟库的 active 变更：当前库优先，其余由最顶层父库开始按父先于子的顺序展示，多库输出增加 `PROJECT` 列。`-c` 加入 completed，`-a` 显示全部状态。嵌套 Git 根和链接目录不纳入外层项目。在顶层库执行 `doco update` 更新共享工作流。
+
 ## 深入聊聊变更
 
 doco 将变更分为需要在归档后保留的 `proposal.md`，和仅在本次工作中保留的 `work/` 目录。`work/` 目录包含可选的 `implement.md / specs / tasks.md` 来保证跨会话和模型的稳定性。
