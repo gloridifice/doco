@@ -1,3 +1,4 @@
+<!-- doco:lifecycle v=1 created-at=- completed-at=- archived-at=2026-10-08T09:59:07Z -->
 # CLI 视觉与交互优化
 
 ## 目的

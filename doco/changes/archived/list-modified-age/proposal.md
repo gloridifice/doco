@@ -1,4 +1,4 @@
-<!-- doco:lifecycle v=1 created-at=- completed-at=2026-09-20T08:02:30Z archived-at=- -->
+<!-- doco:lifecycle v=1 created-at=- completed-at=2026-09-20T08:02:30Z archived-at=2026-10-08T09:59:07Z -->
 # list 生命周期时间距今显示
 
 ## 目的

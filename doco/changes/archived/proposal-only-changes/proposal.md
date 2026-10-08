@@ -1,17 +1,18 @@
+<!-- doco:lifecycle v=1 created-at=- completed-at=- archived-at=2026-10-08T09:59:08Z -->
 # 支持仅 proposal 的轻量变更
 
 ## 目的
 
-当前 active/completed 变更必须同时保存 `proposal.md`、`work/implement.md` 和 `work/tasks.md`。目标明确、无需独立设计或任务拆分的小型受跟踪变更也必须维护两份 work 文件，成本与收益不匹配。同时，现有 Agent 入口容易让人误以为所有行为或实现细节修改都必须创建 doco 变更；但归档只保留 proposal，doco 本身并不是实现历史系统。
+此前 active/completed 变更必须同时保存 `proposal.md`、实现设计和任务列表两份工作文件。目标明确、无需独立设计或任务拆分的小型受跟踪变更也必须维护这两份文件，成本与收益不匹配。同时，现有 Agent 入口容易让人误以为所有行为或实现细节修改都必须创建 doco 变更；但归档只保留 proposal，doco 本身并不是实现历史系统。
 
 本变更让用户显式选择仅 proposal 的受跟踪格式，并明确普通行为修复和实现细节修改可以不创建 doco 变更。Git、PR 或项目原有发布记录继续承担实现历史职责。
 
 ## 范围与完成标准
 
 - `doco new <id> --proposal-only` 创建只包含 `proposal.md` 的 active 变更，并在 proposal 中写入可机械识别的 `<!-- doco:change mode=proposal-only -->` 标记；默认 `new` 和没有模式标记的既有变更继续使用完整工作包。
-- active/completed 支持完整工作包和仅 proposal 两种格式。仅 proposal 格式禁止存在 `work/`；完整格式缺少 work 文件时不得被自动降级，避免绕过任务检查。
+- active/completed 支持完整工作包和仅 proposal 两种格式。仅 proposal 格式禁止存在工作目录；完整格式缺少工作文件时不得被自动降级，避免绕过任务检查。
 - check、complete、reopen、context、list、archive 和 cancel 均正确处理两种格式。仅 proposal 完成时必须有非 pending 的 Result、无未解决 blocker，并在 proposal 中记录非空验证证据；不要求任务复选框。
-- list 对仅 proposal 和 archived 的 TASKS 显示 `-`；完整格式任务缺失仍显示 `?`。archive 将仅 proposal 无 `work/` 视为正常状态，同时保留完整包部分清理后的重试能力。
+- list 对仅 proposal 和 archived 的 TASKS 显示 `-`；完整格式任务缺失仍显示 `?`。archive 将仅 proposal 无工作目录视为正常状态，同时保留完整包部分清理后的重试能力。
 - 根 Agent 入口和随工具发布的 skill 明确：doco 变更是可选的设计/协调记录，不是实现历史；普通行为修复和实现细节修改无需强制创建变更，但无论是否跟踪，只要当前架构或规范事实受影响就必须同步当前文档。
 - 更新 README、当前架构、CLI 契约和文档格式规范；保持既有无标记完整变更及公开库创建入口兼容。
 - 非目标：按代码行数或风险自动判断“小变更”；替代 Git/PR/发布记录；保存完整变更归档时的 work；引入数据库或新的生命周期状态。

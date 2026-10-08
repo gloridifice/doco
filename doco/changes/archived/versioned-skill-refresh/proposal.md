@@ -1,3 +1,4 @@
+<!-- doco:lifecycle v=1 created-at=- completed-at=2026-10-08T10:02:17Z archived-at=2026-10-08T10:02:29Z -->
 # versioned-skill-refresh
 
 ## Purpose
@@ -40,4 +41,8 @@
 
 ## Result
 
-Pending — not completed.
+已交付根 skill 单一 bundle 版本标记、旧版受管 bundle 自动升级，以及“其他文件先写、根 skill 最后提交”的组内补偿回滚；新安装与显式刷新也采用相同机制。内嵌资源统一规范为 LF，已有文件更新仍保留原换行风格。交付时的首版为 v1，当前发布与安装副本已随后续变更升至 v5。
+
+原范围中的 Pi-only 旧目录复用在本变更实施时交付，之后被 [Agent 集成收敛](doco:update-agent-integrations) 明确取代：当前仅支持 Most agents 与 Claude，旧 `.pi/skills/doco` 目录作为迁移冲突处理，不再复用。本次完成确认的是版本升级与回滚机制，不将已废止的 Pi-only 行为声明为当前契约。
+
+验证：本次复核 `cargo fmt --all --check`、`cargo clippy --all-targets --locked -- -D warnings`、`cargo test --all-targets --locked`（全部非忽略测试通过，规模基准需显式运行）和 `cargo build --release --locked` 均通过；`doco check versioned-skill-refresh` 通过，但对行内路径形文本有非阻塞引用警告。组内失败、并发保护、旧版升级及旧路径迁移边界由当前自动测试覆盖；不承诺强制终止、断电或持续文件系统故障时的物理事务。当前架构和 CLI 契约已同步。

@@ -1,3 +1,4 @@
+<!-- doco:lifecycle v=1 created-at=- completed-at=2026-10-08T10:02:17Z archived-at=2026-10-08T10:02:29Z -->
 # 分层任务编号
 
 ## Purpose
